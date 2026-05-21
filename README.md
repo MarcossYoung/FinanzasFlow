@@ -18,7 +18,7 @@ The project is in the middle of a domain cleanup from the old furniture workflow
 
 | Layer | Technology |
 |---|---|
-| Backend | Spring Boot 3.5 / Java 25 |
+| Backend | Spring Boot 3.5 / Java 21 |
 | Database | PostgreSQL with Flyway migrations |
 | Auth | Spring Security + JWT |
 | Frontend | React 19 / Create React App |
@@ -49,7 +49,7 @@ The backend runs on `http://localhost:8080` by default.
 If Maven cannot find Java on Windows, set `JAVA_HOME` first:
 
 ```powershell
-$env:JAVA_HOME='C:\Program Files\Java\jdk-25.0.3'
+$env:JAVA_HOME='C:\Program Files\Java\jdk-21'
 .\mvnw.cmd spring-boot:run
 ```
 
