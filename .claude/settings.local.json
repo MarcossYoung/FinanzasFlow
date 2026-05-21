@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(cmd /c \"cd C:\\\\Users\\\\marco\\\\Dev\\\\Projects\\\\MueblesWorkFlow\\\\backEnd && mvnw.cmd --version 2>&1 && echo BUILD_SUCCESS\")",
+      "Bash(cmd /c \"C:\\\\Users\\\\marco\\\\Dev\\\\Projects\\\\MueblesWorkFlow\\\\backEnd\\\\mvnw.cmd --version > C:\\\\Users\\\\marco\\\\build_out.txt 2>&1\")",
+      "Bash(powershell -Command \"Get-ChildItem ''C:\\\\Program Files\\\\Java'' -ErrorAction SilentlyContinue; Get-ChildItem ''C:\\\\Program Files\\\\Eclipse Adoptium'' -ErrorAction SilentlyContinue; Get-ChildItem ''C:\\\\Program Files\\\\Microsoft'' -Filter ''jdk*'' -ErrorAction SilentlyContinue; [System.Environment]::GetEnvironmentVariable\\(''JAVA_HOME'', ''Machine''\\); [System.Environment]::GetEnvironmentVariable\\(''JAVA_HOME'', ''User''\\)\")",
+      "Bash(powershell -Command \"Get-ChildItem ''C:\\\\Program Files\\\\'' | Where-Object {$_Name -match ''java|jdk|jre|eclipse|adopt|temurin|corretto|zulu|graal''}\")",
+      "Bash(powershell -Command:*)",
+      "Bash(cmd /c \"C:\\\\Users\\\\marco\\\\build_backend.bat\")",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\marco\\\\build_backend.ps1\")",
+      "WebFetch(domain:search.maven.org)",
+      "Bash(find \"C:\\\\Users\\\\marco\\\\Dev\\\\Projects\\\\MueblesWorkFlow\\\\frontEnd\\\\muebles_workflow\\\\src\" -type f \\\\\\( -name \"*.js\" -o -name \"*.jsx\" \\\\\\) | xargs grep -l \"Chatbot\\\\|chatbot\" 2>/dev/null)",
+      "Bash(node:*)",
+      "Bash(find \"C:\\\\Users\\\\marco\\\\Dev\\\\Projects\\\\MueblesWorkFlow\\\\frontEnd\\\\muebles_workflow\\\\src\\\\views\" -type f \\\\\\( -name \"*.jsx\" -o -name \"*.js\" \\\\\\) 2>/dev/null | sort)",
+      "Bash(find \"C:\\\\Users\\\\marco\\\\Dev\\\\Projects\\\\MueblesWorkFlow\\\\frontEnd\\\\muebles_workflow\\\\src\\\\components\" -type f \\\\\\( -name \"*.jsx\" -o -name \"*.js\" \\\\\\) 2>/dev/null | sort)",
+      "Bash(find /c/Users/marco/Dev/Projects/MueblesWorkFlow/frontEnd/muebles_workflow/src/views -type f -name \"*.jsx\" -o -name \"*.js\" 2>/dev/null | sort)",
+      "Bash(find /c/Users/marco/Dev/Projects/MueblesWorkFlow/backEnd/src/main/java/com/example/demo/dto -type f -name \"*.java\" | xargs basename -a | sort)",
+      "Bash(find /c/Users/marco/Dev/Projects/MueblesWorkFlow/frontEnd/muebles_workflow/src/components -type f \\\\\\( -name \"*.jsx\" -o -name \"*.js\" \\\\\\) 2>/dev/null | sort)",
+      "Bash(find /c/Users/marco/Dev/Projects/MueblesWorkFlow/backEnd/src/main/java/com/example/demo/model -type f -name \"*.java\" 2>/dev/null | sort)",
+      "Bash(find /c/Users/marco/Dev/Projects/MueblesWorkFlow/backEnd/src/main/java/com/example/demo/dto -type f -name \"*.java\" 2>/dev/null | sort)",
+      "Bash(cd:*)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\marco\\\\Dev\\\\Projects\\\\MueblesWorkFlow\\\\backEnd\\\\src\\\\main\\\\java\\\\com\\\\example\\\\demo\" -Recurse -File)",
+      "Bash(Select-Object FullName)",
+      "Bash(Start-Sleep -Seconds 30)",
+      "Bash(Get-Content \"C:\\\\Users\\\\marco\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-marco-Dev-Projects-MueblesWorkFlow\\\\41ad2eaf-1bc4-4b96-8148-be202f797bb3\\\\tasks\\\\bmpecua7g.output\")",
+      "Bash(Select-Object -Last 30)"
+    ]
+  }
+}

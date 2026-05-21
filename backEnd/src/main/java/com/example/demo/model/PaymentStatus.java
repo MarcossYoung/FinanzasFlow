@@ -1,0 +1,8 @@
+package com.example.demo.model;
+
+public enum PaymentStatus {
+    PAGO_SEÑA, CANCELADO, ABONADO, REEMBOLSO,
+    PENDIENTE, AL_DIA, POR_VENCER_3D,
+    VENCIDO_1_30, VENCIDO_31_60, VENCIDO_61_90,
+    EN_GESTION, INCOBRABLE, PAGADO
+}

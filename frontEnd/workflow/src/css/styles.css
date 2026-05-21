@@ -1,0 +1,1311 @@
+/* =========================================
+   1. FONTS & RESET
+   ========================================= */
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700;800&display=swap');
+
+* {
+	box-sizing: border-box;
+}
+html {
+	line-height: 1.15;
+	-webkit-text-size-adjust: 100%;
+}
+body {
+	margin: 0;
+	padding: 0;
+	font-family: 'Nunito Sans', sans-serif;
+	background-color: #f7f9fc;
+	color: #2d3436;
+}
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	margin: 0 0 1rem 0;
+	font-weight: 700;
+}
+a {
+	text-decoration: none;
+	color: inherit;
+	transition: color 0.2s ease;
+}
+ul {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+button,
+input,
+select,
+textarea {
+	font-family: 'Nunito Sans', sans-serif;
+}
+
+/* =========================================
+   2. LAYOUT & SIDEBAR (TIGHTER FIT)
+   ========================================= */
+:root {
+	/* Reduced width to close the "Dead Space" gap */
+	--sidebar-width: 180px;
+}
+
+.app-layout {
+	display: flex;
+	min-height: 100vh;
+}
+
+/* Sidebar Styles */
+.sidebar {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: var(--sidebar-width);
+	height: 100vh;
+	background-color: #000;
+	color: #fff;
+	border-right: 1px solid #222;
+	padding-top: 2rem;
+	z-index: 1000;
+	display: flex;
+	flex-direction: column;
+}
+
+.sidebar li {
+	width: 100%;
+	border-bottom: 1px solid #111;
+}
+.sidebar a {
+	padding: 1rem 1.5rem;
+	color: #f5f5f5;
+	display: flex;
+	align-items: center;
+	gap: 0.8rem;
+	font-weight: 600;
+	font-size: 1.1rem;
+}
+.sidebar a:hover,
+.sidebar a.active {
+	background-color: #00b894;
+	color: white;
+}
+
+/* MAIN CONTENT - STRETCH TO FILL */
+main,
+.main-content,
+.admin-dashboard,
+.orders-container,
+.orders-due-container,
+.profile-wrapper,
+.product-wrapper,
+.dashboard-content {
+	/* Pushes content just enough to clear sidebar */
+	margin-left: var(--sidebar-width) !important;
+
+	/* Forces content to fill the remaining screen width */
+	width: calc(100% - var(--sidebar-width)) !important;
+
+	/* Reduced left padding to bring table closer to sidebar */
+	padding: 2rem 2rem 2rem 1rem;
+
+	min-height: 100vh;
+	background-color: #f7f9fc;
+	overflow-x: hidden;
+}
+
+/* Full width for Login page only */
+.login-wrapper {
+	margin-left: 0 !important;
+	width: 100% !important;
+}
+
+/* =========================================
+   3. ALIGNMENT FIXES (INPUTS & BUTTONS)
+   ========================================= */
+
+/* Fix for the top controls in "Por vencer esta semana" */
+.admin-tools,
+.add-order-section,
+.filter-section {
+	/* Added generic class just in case */
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center; /* Vertically center items */
+	gap: 1rem; /* Consistent spacing between input and button */
+	margin-bottom: 1.5rem;
+	width: 100%;
+}
+
+/* Make inputs look nice next to buttons */
+.admin-tools input,
+.add-order-section input {
+	flex: 1; /* Take up available space */
+	min-width: 200px;
+	padding: 0.7rem;
+	border: 1px solid #ddd;
+	border-radius: 8px;
+	height: 45px; /* Fixed height so buttons and inputs match */
+}
+
+/* Force buttons to same height as inputs */
+.button-green,
+.button_1,
+.button-red,
+.btn {
+	height: 45px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	white-space: nowrap;
+	padding: 0 1.5rem;
+}
+/* --- Add Order Form (Toolbar Style) --- */
+.add-order-section {
+	background: transparent; /* No white background */
+	padding: 0; /* No internal padding */
+	margin-bottom: 1rem; /* Space between bar and table */
+	width: 100%; /* Full width to match table */
+	max-width: 100%; /* Remove the 700px limit */
+	box-shadow: none; /* No shadow */
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+}
+
+.add-order-form {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	width: 100%; /* Stretch form to fill container */
+}
+
+/* Input styling to match other views */
+.add-order-input {
+	flex: 1; /* Grows to fill space */
+	padding: 0.7rem 1rem;
+	border: 1px solid #ddd;
+	border-radius: 8px;
+	font-size: 1rem;
+	height: 45px; /* Fixed height for alignment */
+	background-color: white;
+}
+
+/* Button alignment */
+.add-order-form .button-green {
+	height: 45px;
+	white-space: nowrap;
+	padding: 0 1.5rem;
+}
+
+/* Messages */
+.add-order-message {
+	font-weight: 600;
+	margin-left: 1rem;
+	white-space: nowrap;
+}
+.add-order-message.green {
+	color: #00b894;
+}
+.add-order-message.red {
+	color: #d63031;
+}
+
+/* =========================================
+   4. TABLE STYLES (FULL WIDTH & COLORS)
+   ========================================= */
+.table-wrapper,
+.orders-table-wrapper {
+	background: white;
+	border-radius: 12px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+
+	/* FIX: Force wrapper to touch the left side */
+	margin: 1rem 0;
+	width: 100%;
+
+	overflow-x: auto; /* Scroll only if absolutely necessary */
+
+	/* Make scrollbar prettier/thinner */
+	scrollbar-width: thin;
+	scrollbar-color: #00b894 #f1f2f6;
+}
+
+.orders-table {
+	width: 100%;
+	border-collapse: collapse;
+	border-spacing: 0;
+	min-width: 800px;
+}
+
+.orders-table th {
+	background-color: #f1f2f6 !important;
+	padding: 1rem;
+	text-align: left;
+	color: #2d3436;
+	font-weight: 800;
+	position: sticky;
+	top: 0;
+	z-index: 100;
+	box-shadow: 0 2px 2px rgba(0, 0, 0, 0.1);
+	background-clip: padding-box;
+}
+
+.orders-table td {
+	padding: 1rem;
+	border-bottom: 1px solid #eee;
+	color: #2d3436;
+	font-weight: 600;
+}
+
+/* --- ROW COLORS --- */
+.row-entregado,
+.row-delivered,
+.status-entregado {
+	background-color: #99f6e4 !important;
+	color: #115e59;
+}
+.row-produccion,
+.row-production,
+.status-produccion {
+	background-color: #bfdbfe !important;
+	color: #1e40af;
+}
+.row-terminado,
+.row-finished,
+.status-terminado {
+	background-color: #bbf7d0 !important;
+	color: #166534;
+}
+.row-atrasado,
+.row-late,
+.status-atrasado {
+	background-color: #fecaca !important;
+	color: #991b1b;
+}
+.orders-table tr:hover {
+	filter: brightness(0.95);
+	cursor: pointer;
+}
+
+/* =========================================
+   5. COMPONENT STYLES
+   ========================================= */
+/* Dashboard Tabs */
+.dashboard-content nav {
+	display: flex;
+	gap: 1rem;
+	margin-bottom: 2rem;
+	border-bottom: 2px solid #e5e7eb;
+	padding-bottom: 0.5rem;
+}
+.nav-pill {
+	padding: 0.6rem 1.2rem;
+	border-radius: 8px;
+	font-weight: 700;
+	color: #636e72;
+	background: transparent;
+	cursor: pointer;
+}
+.nav-pill:hover {
+	background-color: #e2e6ea;
+	color: #2d3436;
+}
+.nav-pill.active {
+	background-color: #00b894;
+	color: white;
+	box-shadow: 0 4px 10px rgba(0, 184, 148, 0.3);
+}
+
+/* Buttons */
+.button-green,
+.button_1 {
+	background: #00b894;
+	color: white;
+	border-radius: 8px;
+	border: none;
+	font-weight: 700;
+	cursor: pointer;
+}
+.button-green:hover {
+	background: #009f7a;
+}
+.button-red {
+	background: #d63031;
+	color: white;
+	border-radius: 8px;
+	border: none;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+/* Utilities */
+.text-center {
+	text-align: center;
+}
+.w-100 {
+	width: 100%;
+}
+.main-title {
+	font-size: 2rem;
+	color: #2d3436;
+	margin-bottom: 1rem;
+	text-align: center;
+}
+.dashboard-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 1.5rem;
+	margin-bottom: 2rem;
+}
+.card {
+	background: white;
+	padding: 1.5rem;
+	border-radius: 12px;
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+	display: flex;
+	align-items: center;
+}
+.card-icon {
+	font-size: 2rem;
+	color: #0984e3;
+	margin-right: 1rem;
+}
+.card-info p {
+	font-size: 1.5rem;
+	font-weight: 800;
+	color: #00b894;
+	margin: 0;
+}
+
+/* =========================================
+   LOGIN PAGE STYLES (Dark Theme)
+   ========================================= */
+.login-wrapper {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: 100vh;
+	background-color: #050505; /* Almost black background */
+
+	/* Ensure layout fixes don't shift this page */
+	margin-left: 0 !important;
+	width: 100% !important;
+	padding: 0 !important;
+}
+
+.login-card {
+	background-color: #121212; /* Dark grey card */
+	padding: 3rem 2.5rem;
+	border-radius: 12px;
+	width: 100%;
+	max-width: 400px;
+
+	/* Subtle border and glow effect */
+	border: 1px solid #333;
+	box-shadow:
+		0 0 20px rgba(0, 0, 0, 0.5),
+		0 0 0 1px rgba(255, 255, 255, 0.05);
+
+	text-align: center;
+}
+
+/* "Iniciar Sesión" Title */
+.login-card h1,
+.login-card h2,
+.login-card h3 {
+	color: #fff;
+	margin-bottom: 2rem;
+	font-size: 1.5rem;
+	font-weight: 700;
+	letter-spacing: 0.5px;
+	/* Optional: If you want the Serif font from the image, uncomment below: */
+	/* font-family: 'Times New Roman', serif; */
+}
+
+/* Form Group (Spacing between inputs) */
+.form-group {
+	margin-bottom: 1.5rem;
+	text-align: left;
+}
+
+/* Labels (Usuario, Contraseña) */
+.login-card label {
+	display: block;
+	margin-bottom: 0.5rem;
+	color: #ccc; /* Light grey text */
+	font-size: 0.9rem;
+	font-weight: 500;
+}
+
+/* Inputs */
+.login-card input {
+	width: 100%;
+	padding: 0.8rem 1rem;
+	background-color: #222; /* Dark input background */
+	border: 1px solid #333; /* Subtle border */
+	border-radius: 6px;
+	color: #fff; /* White text */
+	font-size: 1rem;
+	margin-top: 0; /* Reset margin */
+	transition: all 0.2s ease;
+}
+
+.login-card input:focus {
+	outline: none;
+	border-color: #00b894; /* Green highlight on focus */
+	background-color: #2a2a2a;
+}
+
+.login-card input::placeholder {
+	color: #555;
+}
+
+/* Button */
+.login-card button,
+.login-card .button_3 {
+	width: 100%;
+	padding: 0.9rem;
+	margin-top: 1rem;
+	background-color: #00b894; /* Teal Green */
+	color: white;
+	border: none;
+	border-radius: 6px;
+	font-size: 1rem;
+	font-weight: 700;
+	cursor: pointer;
+	transition: background 0.3s ease;
+}
+
+.login-card button:hover,
+.login-card .button_3:hover {
+	background-color: #00a17f; /* Darker green on hover */
+}
+
+/* Error Message */
+.error-message {
+	background-color: rgba(214, 48, 49, 0.2);
+	border: 1px solid #d63031;
+	color: #ff7675;
+	margin-bottom: 1.5rem;
+	padding: 0.8rem;
+	border-radius: 6px;
+	font-size: 0.9rem;
+}
+/* =========================================
+   COSTS / EXPENSES PAGE STYLES
+   ========================================= */
+
+/* The Main Card Container */
+.costs-wrapper {
+	background: white;
+	border-radius: 12px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+	padding: 2rem;
+	width: 100%;
+	margin-top: 1rem;
+}
+
+/* Header Section */
+.costs-header {
+	margin-bottom: 2rem;
+	border-bottom: 1px solid #f1f2f6;
+	padding-bottom: 1rem;
+}
+
+.costs-header h2 {
+	color: #2d3436;
+	font-size: 1.5rem;
+	margin-bottom: 0.5rem;
+}
+
+/* Form Grid - Aligns inputs in a row */
+.costs-form {
+	display: grid;
+	/* This automatically fits as many columns as possible, min 150px wide */
+	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+	gap: 1.5rem;
+	align-items: end; /* Aligns the button with the bottom of inputs */
+	margin-bottom: 3rem;
+}
+
+.form-group {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.form-group label {
+	font-size: 0.9rem;
+	font-weight: 600;
+	color: #636e72;
+}
+
+/* Button adjustment for the grid */
+.costs-form .button-green {
+	height: 45px; /* Matches input height exactly */
+	width: 100%;
+	justify-content: center;
+}
+
+/* Delete Action Button (Mini Red Button) */
+.btn-delete {
+	background-color: rgba(214, 48, 49, 0.1);
+	color: #d63031;
+	border: none;
+	padding: 0.4rem 0.8rem;
+	border-radius: 6px;
+	font-weight: 600;
+	font-size: 0.85rem;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.btn-delete:hover {
+	background-color: #d63031;
+	color: white;
+}
+
+/*  Pretty "My Sales" Pill Button */
+.btn-pill {
+	padding: 0 1.5rem;
+	height: 45px;
+	border-radius: 50px;
+	border: 2px solid #3b82f6;
+	background-color: transparent;
+	color: #3b82f6;
+	font-weight: 700;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	transition: all 0.3s ease;
+}
+
+.btn-pill.active {
+	background-color: #3b82f6;
+	color: white;
+	box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-pill:hover {
+	transform: translateY(-1px);
+}
+
+.pagination-container {
+	flex-shrink: 0; /* Don't shrink */
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: 1.5rem;
+	padding-top: 0.5rem;
+}
+
+.btn-pagination {
+	background: white;
+	border: 1px solid #ddd;
+	padding: 0.5rem 1rem;
+	border-radius: 8px;
+	cursor: pointer;
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	transition: background 0.2s;
+}
+.btn-pagination:hover:not(:disabled) {
+	background-color: #f1f2f6;
+}
+.btn-pagination:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* =========================================
+   6. MODAL & FULL WIDTH FIXES
+   ========================================= */
+
+/* Arreglo para que el Modal tape TODO (incluso el sidebar) */
+.modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	background-color: rgba(0, 0, 0, 0.6); /* Fondo oscuro semitransparente */
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	z-index: 9999; /* Z-Index altísimo para ganar al sidebar */
+	backdrop-filter: blur(2px); /* Efecto borroso lindo */
+}
+
+.modal-content {
+	background: white;
+	padding: 2rem;
+	border-radius: 12px;
+	width: 90%;
+	max-width: 600px;
+	max-height: 90vh;
+	overflow-y: auto;
+	box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+	position: relative;
+	animation: fadeIn 0.3s ease;
+}
+
+/* Animación de entrada suave */
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Arreglo para el botón "Cerrar" del modal si lo necesitas */
+.close-modal-btn {
+	position: absolute;
+	top: 1rem;
+	right: 1rem;
+	background: none;
+	border: none;
+	font-size: 1.5rem;
+	cursor: pointer;
+	color: #666;
+}
+
+/* Arreglo del contenedor de la tabla para que no deje espacio a la izquierda */
+.orders-view-container {
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	padding: 0;
+}
+
+/* =========================================
+   7. PRODUCT CREATION FORM STYLES
+   ========================================= */
+
+/* Contenedor Principal (Tarjeta) */
+.product-creation-container {
+	background: white;
+	/* Si no es modal, usa padding normal. Si es modal, el modal-content ya tiene padding */
+	padding: 1rem 0;
+	width: 100%;
+	border-radius: 12px;
+}
+
+/* Ajuste específico cuando está dentro del Modal */
+.product-creation-container.is-modal {
+	box-shadow: none; /* El modal ya tiene sombra */
+	padding: 0;
+}
+
+/* Header del Formulario */
+.form-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 2rem;
+	border-bottom: 1px solid #f1f2f6;
+	padding-bottom: 1rem;
+}
+
+.form-header h2 {
+	font-size: 1.5rem;
+	color: #2d3436;
+	margin: 0;
+}
+
+.close-x {
+	background: none;
+	border: none;
+	font-size: 2rem;
+	color: #b2bec3;
+	cursor: pointer;
+	line-height: 1;
+	transition: color 0.2s;
+}
+
+.close-x:hover {
+	color: #d63031;
+}
+
+/* Estructura del Formulario */
+.creation-form {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+}
+
+/* Filas de Inputs (para poner 2 en linea) */
+.input-row {
+	display: flex;
+	gap: 1.5rem;
+	width: 100%;
+}
+
+/* En móviles, que se pongan uno abajo del otro */
+@media (max-width: 600px) {
+	.input-row {
+		flex-direction: column;
+		gap: 1rem;
+	}
+}
+
+/* Grupos de Inputs */
+.input-group {
+	flex: 1; /* Ocupar espacio igual */
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.input-group.full-width {
+	width: 100%;
+}
+
+/* Estilo de Inputs, Selects y Textareas */
+.input-group label {
+	font-weight: 700;
+	color: #636e72;
+	font-size: 0.9rem;
+}
+
+.input-group input,
+.input-group select,
+.input-group textarea {
+	padding: 0.8rem 1rem;
+	border: 1px solid #dfe6e9;
+	border-radius: 8px;
+	font-size: 1rem;
+	color: #2d3436;
+	background-color: #fff;
+	transition: all 0.2s ease;
+	width: 100%;
+	font-family: 'Nunito Sans', sans-serif;
+}
+
+.input-group input:focus,
+.input-group select:focus,
+.input-group textarea:focus {
+	outline: none;
+	border-color: #00b894;
+	box-shadow: 0 0 0 3px rgba(0, 184, 148, 0.1);
+}
+
+/* Botón de Guardar */
+.submit-button {
+	margin-top: 1rem;
+	background-color: #00b894;
+	color: white;
+	font-weight: 700;
+	padding: 1rem;
+	border: none;
+	border-radius: 8px;
+	cursor: pointer;
+	font-size: 1rem;
+	transition:
+		background 0.2s,
+		transform 0.1s;
+	width: 100%;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.submit-button:hover:not(:disabled) {
+	background-color: #00a383;
+	transform: translateY(-2px);
+}
+
+.submit-button:disabled {
+	background-color: #b2bec3;
+	cursor: not-allowed;
+}
+
+/* Mensajes de Feedback */
+.error-text {
+	color: #d63031;
+	background: #fab1a0;
+	padding: 0.8rem;
+	border-radius: 6px;
+	text-align: center;
+	font-weight: 600;
+	margin-top: 1rem;
+}
+
+.success-text {
+	color: #009432;
+	background: #b8e994;
+	padding: 0.8rem;
+	border-radius: 6px;
+	text-align: center;
+	font-weight: 600;
+	margin-top: 1rem;
+}
+
+.line-items-section {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	border-top: 1px solid #f1f2f6;
+	border-bottom: 1px solid #f1f2f6;
+	padding: 1rem 0;
+}
+
+.line-items-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+}
+
+.line-items-header h3 {
+	margin: 0;
+	font-size: 1.1rem;
+	color: #2d3436;
+}
+
+.line-items-grid {
+	display: grid;
+	grid-template-columns: minmax(180px, 1fr) 100px 140px 140px 44px;
+	gap: 0.75rem;
+	align-items: center;
+}
+
+.line-items-grid input {
+	width: 100%;
+	padding: 0.75rem 0.85rem;
+	border: 1px solid #dfe6e9;
+	border-radius: 8px;
+	font-size: 0.95rem;
+}
+
+.line-items-grid-header {
+	color: #636e72;
+	font-size: 0.85rem;
+	font-weight: 800;
+}
+
+.line-item-subtotal {
+	font-weight: 800;
+	color: #2d3436;
+	white-space: nowrap;
+}
+
+.line-item-remove {
+	width: 36px;
+	height: 36px;
+	border: 1px solid rgba(214, 48, 49, 0.2);
+	border-radius: 8px;
+	background: rgba(214, 48, 49, 0.08);
+	color: #d63031;
+	font-weight: 800;
+	cursor: pointer;
+}
+
+.line-items-total {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 1rem;
+	font-size: 1.05rem;
+	color: #2d3436;
+}
+
+.line-items-total strong {
+	font-size: 1.25rem;
+}
+
+.customers-page {
+	width: 100%;
+}
+
+.customers-header {
+	align-items: flex-start;
+	margin-bottom: 1rem;
+}
+
+.customers-header .main-title {
+	text-align: left;
+	margin-bottom: 0.25rem;
+}
+
+.customers-header p {
+	margin: 0;
+	color: #636e72;
+	font-weight: 600;
+}
+
+.customers-layout {
+	display: grid;
+	grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+	gap: 1.25rem;
+	align-items: start;
+}
+
+.customer-form-panel,
+.customers-list-panel {
+	background: #fff;
+	border-radius: 8px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+	padding: 1.25rem;
+}
+
+.customer-form-panel .form-header {
+	margin-bottom: 1rem;
+}
+
+.customer-form-panel .close-x {
+	font-size: 1rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.customers-toolbar {
+	display: flex;
+	gap: 1rem;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 1rem;
+}
+
+.customer-search {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	min-width: 220px;
+	padding: 0 0.9rem;
+	height: 45px;
+	border: 1px solid #dfe6e9;
+	border-radius: 8px;
+	background: #fff;
+	color: #636e72;
+}
+
+.customer-search input {
+	border: none;
+	outline: none;
+	width: 100%;
+	font-size: 0.95rem;
+	color: #2d3436;
+}
+
+.customers-table-wrapper {
+	margin: 0;
+	box-shadow: none;
+	border: 1px solid #f1f2f6;
+}
+
+.customers-table {
+	min-width: 760px;
+}
+
+.customers-table td strong,
+.customers-table td span {
+	display: block;
+}
+
+.customers-table td small {
+	display: block;
+	margin-top: 0.25rem;
+	color: #636e72;
+	font-weight: 600;
+	line-height: 1.35;
+}
+
+.score-pill {
+	display: inline-flex !important;
+	align-items: center;
+	justify-content: center;
+	min-width: 42px;
+	height: 30px;
+	border-radius: 999px;
+	background: rgba(0, 184, 148, 0.12);
+	color: #008f72;
+	font-weight: 800;
+}
+
+.table-actions {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+}
+
+.icon-action {
+	width: 36px;
+	height: 36px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid #dfe6e9;
+	border-radius: 8px;
+	background: #fff;
+	color: #3b82f6;
+	cursor: pointer;
+}
+
+.icon-action.danger {
+	color: #d63031;
+}
+
+.icon-action:hover {
+	background: #f7f9fc;
+}
+
+.empty-cell {
+	text-align: center;
+	padding: 2rem !important;
+	color: #888 !important;
+}
+
+.finance-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.finance-print-report {
+	display: none;
+}
+
+.finance-report-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 2rem;
+	padding-bottom: 1rem;
+	border-bottom: 2px solid #2d3436;
+}
+
+.finance-report-kicker {
+	margin: 0 0 0.35rem;
+	color: #00a383;
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+
+.finance-report-header h1 {
+	margin: 0 0 0.5rem;
+	font-size: 1.8rem;
+	color: #111827;
+}
+
+.finance-report-header p {
+	margin: 0;
+	color: #4b5563;
+}
+
+.finance-report-meta {
+	display: grid;
+	grid-template-columns: auto auto;
+	gap: 0.35rem 0.75rem;
+	font-size: 0.85rem;
+	text-align: right;
+	color: #4b5563;
+}
+
+.finance-report-meta strong {
+	color: #111827;
+}
+
+.finance-report-section {
+	margin-top: 1.25rem;
+	page-break-inside: avoid;
+}
+
+.finance-report-section h2 {
+	margin: 0 0 0.75rem;
+	font-size: 1rem;
+	color: #111827;
+}
+
+.finance-report-kpis {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 0.75rem;
+}
+
+.finance-report-kpi {
+	border: 1px solid #d1d5db;
+	border-radius: 8px;
+	padding: 0.85rem;
+	background: #fff;
+}
+
+.finance-report-kpi span {
+	display: block;
+	color: #4b5563;
+	font-size: 0.82rem;
+	font-weight: 700;
+	margin-bottom: 0.35rem;
+}
+
+.finance-report-kpi strong {
+	display: block;
+	color: #111827;
+	font-size: 1.15rem;
+}
+
+.finance-report-copy {
+	margin: 0;
+	color: #374151;
+	line-height: 1.55;
+	white-space: pre-wrap;
+}
+
+.finance-report-charts {
+	display: grid;
+	grid-template-columns: 1.35fr 0.85fr;
+	gap: 1rem;
+	align-items: start;
+}
+
+.finance-report-charts > div {
+	border: 1px solid #d1d5db;
+	border-radius: 8px;
+	padding: 0.85rem;
+	background: #fff;
+}
+
+.finance-report-footer {
+	margin-top: 1.25rem;
+	padding-top: 0.75rem;
+	border-top: 1px solid #d1d5db;
+	font-size: 0.78rem;
+	color: #6b7280;
+}
+
+@media (max-width: 760px) {
+	.line-items-grid,
+	.line-items-grid-header {
+		grid-template-columns: 1fr;
+	}
+
+	.line-items-grid-header {
+		display: none;
+	}
+
+	.line-item-subtotal {
+		text-align: right;
+	}
+
+	.customers-layout {
+		grid-template-columns: 1fr;
+	}
+
+	.customers-toolbar {
+		align-items: stretch;
+		flex-direction: column;
+	}
+}
+
+@media print {
+	@page {
+		size: A4;
+		margin: 14mm;
+	}
+
+	body {
+		background: #fff !important;
+		color: #111827 !important;
+	}
+
+	body * {
+		visibility: hidden !important;
+	}
+
+	.finance-print-report,
+	.finance-print-report * {
+		visibility: visible !important;
+	}
+
+	.finance-print-report {
+		display: block !important;
+		position: absolute;
+		inset: 0 auto auto 0;
+		width: 100%;
+		padding: 0;
+		background: #fff;
+		font-family: 'Nunito Sans', Arial, sans-serif;
+	}
+
+	.finance-actions,
+	.sidebar,
+	.ai-chat-panel {
+		display: none !important;
+	}
+
+	.finance-report-kpis {
+		grid-template-columns: repeat(3, 1fr);
+	}
+
+	.finance-report-charts {
+		grid-template-columns: 1.2fr 0.8fr;
+	}
+
+	.finance-report-charts svg {
+		max-height: 260px;
+	}
+}
+
+
+/* =========================================
+   RESPONSIVE LAYOUT
+   ========================================= */
+
+/* Laptops / medium desktops */
+@media (max-width: 1200px) {
+	.sidebar a {
+		padding: 0.8rem 1rem;
+		font-size: 1rem;
+	}
+}
+
+/* Tablets landscape — narrow the sidebar */
+@media (max-width: 960px) {
+	:root {
+		--sidebar-width: 140px;
+	}
+	.sidebar a {
+		padding: 0.7rem 0.8rem;
+		font-size: 0.9rem;
+		gap: 0.4rem;
+	}
+}
+
+/* Tablets portrait — compact sidebar */
+@media (max-width: 768px) {
+	:root {
+		--sidebar-width: 0px;
+	}
+	.sidebar {
+		display: none;
+	}
+	main,
+	.main-content,
+	.admin-dashboard,
+	.orders-container,
+	.orders-due-container,
+	.profile-wrapper,
+	.product-wrapper,
+	.dashboard-content {
+		padding: 1rem;
+	}
+	.orders-table th,
+	.orders-table td {
+		padding: 0.6rem 0.5rem;
+		font-size: 0.85rem;
+	}
+	.dashboard-content nav {
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+}

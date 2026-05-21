@@ -1,0 +1,17 @@
+pedido (titulo): nombre de marca + numero;
+foto *clave*
+tiempo frenado sin entregar.
+Admin crea usuarios.
+
+cuenta para el chino; nota pasado de dia de entrega.
+q pedidos deberian salir esa semana.
+terminado para entrega- marca el chino.
+
+foto con celular- n8n;
+
+fecha entrega aproximacion a siguiente paso.
+- processo de produccion para cada tipo de mueble es distinto
+
+inventario q vaya restando o sumando a futuro.
+
+cambie de color a medida q suben la semanas.

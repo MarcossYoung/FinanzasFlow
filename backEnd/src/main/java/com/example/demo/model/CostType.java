@@ -1,0 +1,6 @@
+package com.example.demo.model;
+
+public enum CostType {
+    RENT,SALARY,TAX, ADS, MATERIAL, OTHERS, SERVICES
+    //ALQUILER,SALARIO,IMPUESTOS,PUBLICIDAD,MATERIALES,SERVICIOS,OTROS
+}

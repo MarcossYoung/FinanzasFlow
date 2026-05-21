@@ -1,0 +1,71 @@
+package com.example.demo.controller;
+
+import com.example.demo.dto.UserSummaryDto;
+import com.example.demo.exceptions.UserAlreadyExistsException;
+import com.example.demo.model.AppUser;
+import com.example.demo.service.AppUserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/users")
+@CrossOrigin(origins = "*")
+public class UserController {
+    private static final Logger log = LoggerFactory.getLogger(UserController.class);
+
+    @Autowired
+    private AppUserService appUserService;
+
+
+    @GetMapping
+    public ResponseEntity<List<UserSummaryDto>> getAllUsers() {
+        return ResponseEntity.ok(appUserService.getAllUsers());
+    }
+
+    @PostMapping("/registro")
+  public ResponseEntity<?> registro(@RequestBody AppUser user) {
+      try {
+          AppUser regUser = appUserService.registerUser(user);
+          return ResponseEntity.status(HttpStatus.CREATED).body(regUser);
+      } catch (Exception e) {
+          return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                  .body("Error: " + e.getMessage());
+      }
+  }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody AppUser user) {
+        String username = user.getUsername() == null ? "" : user.getUsername().trim();
+        log.info("Login attempt for username='{}'", username);
+        try {
+            Map<String, Object> response = appUserService.loginUser(username, user.getPassword());
+            log.info("Login success for username='{}'", username);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            log.warn("Login failed for username='{}': {}", username, e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Invalid username or password"));
+        }
+    }
+
+
+    @GetMapping("/{id}")
+    public ResponseEntity<AppUser> getUser(@PathVariable Long id) {
+
+
+        System.out.println(appUserService.getUserById(id));
+        return ResponseEntity.ok(appUserService.getUserById(id));
+    }
+
+    @GetMapping("/test")
+    public ResponseEntity<String> test() {
+        return ResponseEntity.ok("Controller is working!");
+    }
+    }
