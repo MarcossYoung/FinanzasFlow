@@ -91,7 +91,7 @@ export default function CostsManager() {
 		} finally {
 			setLoading(false);
 		}
-	}, [user.token, currentPage, selectedMonth, selectedType, monthRange]);
+	}, [user.token, currentPage, selectedType, monthRange]);
 
 	useEffect(() => {
 		fetchCosts();
