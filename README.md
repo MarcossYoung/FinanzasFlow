@@ -113,13 +113,17 @@ TELEGRAM_REMINDERS_CRON=<optional, default 0 0 9 * * *>
 Frontend environment lives in:
 
 ```text
-frontEnd/muebles_workflow/.env
+frontEnd/workflow/.env
 ```
 
 ```properties
-REACT_APP_TEST_URL=http://localhost:8080
-REACT_APP_PROD_URL=<production-api-url>
 REACT_APP_NAME=FinanzasFlow
+```
+
+API requests from the frontend are pinned in code to:
+
+```text
+https://finanzasflow-production.up.railway.app
 ```
 
 ## Notes
