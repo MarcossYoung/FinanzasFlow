@@ -114,7 +114,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOriginPatterns(List.of("http://localhost:*", "https://finanzasdashboard.netlify.app"));
+        config.setAllowedOriginPatterns(List.of("http://localhost:*", "https://**--finanzasdashboard.netlify.app"));
 
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
