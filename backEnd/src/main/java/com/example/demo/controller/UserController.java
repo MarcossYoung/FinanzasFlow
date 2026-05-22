@@ -57,11 +57,10 @@ public class UserController {
 
 
     @GetMapping("/{id}")
-    public ResponseEntity<AppUser> getUser(@PathVariable Long id) {
-
-
-        System.out.println(appUserService.getUserById(id));
-        return ResponseEntity.ok(appUserService.getUserById(id));
+    public ResponseEntity<UserSummaryDto> getUser(@PathVariable Long id) {
+        AppUser u = appUserService.getUserById(id);
+        if (u == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(new UserSummaryDto(u.getId(), u.getUsername(), u.getAppUserRole().name()));
     }
 
     @GetMapping("/test")

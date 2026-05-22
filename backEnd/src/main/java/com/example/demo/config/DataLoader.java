@@ -74,9 +74,11 @@ public class DataLoader implements CommandLineRunner {
     private AppUser ensureUser(String username, String rawPassword, AppUserRole role, String phone, Tenant tenant) {
         AppUser user = userRepo.findByUsername(username).orElseGet(() -> {
             AppUser u = new AppUser(username, passwordEncoder.encode(rawPassword), role, phone);
+            u.setTenant(tenant);
             return userRepo.save(u);
         });
-        user.setPassword(passwordEncoder.encode(rawPassword));
+        // Never overwrite an existing password — only update role/phone/tenant so
+        // passwords changed via the admin panel survive restarts
         user.setAppUserRole(role);
         user.setPhoneNumber(phone);
         user.setTenant(tenant);

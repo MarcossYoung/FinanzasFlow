@@ -63,7 +63,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         // Existing public paths
-                        .requestMatchers("/api/users/registro", "/api/users/login").permitAll()
+                        .requestMatchers("/api/users/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/users/registro").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/payments", "/api/payments/**").permitAll()
                         .requestMatchers("/api/workorders", "/api/workorders/**").permitAll()
 

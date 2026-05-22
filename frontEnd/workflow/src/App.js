@@ -26,6 +26,7 @@ const InvoiceDetail = lazy(() => import('./views/invoiceDetail'));
 const InvoiceEdit = lazy(() => import('./views/invoiceEditForm'));
 const Profile = lazy(() => import('./views/profile'));
 const AdminPage = lazy(() => import('./views/adminPage'));
+const OperatorPage = lazy(() => import('./views/OperatorPage'));
 const InvoicesDueSoon = lazy(() => import('./views/invoicesDueSoon'));
 const InvoicesUnpaid = lazy(() => import('./views/invoicesUnpaid'));
 const InvoicesOverdue = lazy(() => import('./views/invoicesOverdue'));
@@ -186,6 +187,20 @@ function App() {
                                 >
                                     <Sidebar />
                                     <AdminPage />
+                                </RoleRoute>
+                            }
+                        />
+                        <Route
+                            path='/operator'
+                            element={
+                                <RoleRoute
+                                    user={user}
+                                    allowedRoles={['SUPER_ADMIN']}
+                                >
+                                    <Sidebar />
+                                    <div className='main-content'>
+                                        <OperatorPage />
+                                    </div>
                                 </RoleRoute>
                             }
                         />

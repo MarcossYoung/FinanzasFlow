@@ -9,6 +9,7 @@ export default function Sidebar() {
 
 	const {user} = useContext(UserContext);
 	const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+	const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 	const isGestor = user?.role === 'GESTOR';
 
 	return (
@@ -42,9 +43,14 @@ export default function Sidebar() {
 				)}
 			</div>
 
-			{(isAdmin ) && (
+			{isAdmin && (
 				<NavLink className={linkClass} to='/admin'>
 					Panel Admin
+				</NavLink>
+			)}
+			{isSuperAdmin && (
+				<NavLink className={linkClass} to='/operator'>
+					Operador
 				</NavLink>
 			)}
 

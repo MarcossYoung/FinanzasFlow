@@ -1,5 +1,6 @@
 package com.example.demo.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -63,6 +64,7 @@ public class AppUser implements UserDetails {
 
 
     @Override
+    @JsonIgnore
     public String getPassword() {
         return password;
     }
@@ -113,7 +115,6 @@ public class AppUser implements UserDetails {
         return "AppUser{" +
                 "id=" + id +
                 ", userName='" + username + '\'' +
-                ", password='" + password + '\'' +
                 ", appUserRole=" + appUserRole +
                 '}';
     }

@@ -1,7 +1,9 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.UserSummaryDto;
 import com.example.demo.model.AppUser;
 import com.example.demo.model.Status;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import com.example.demo.repository.UserRepo;
 import com.example.demo.service.AppUserService;
 import com.example.demo.service.InvoiceService;
@@ -16,16 +18,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+
 @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
 @RestController
 @RequestMapping("/api/admin")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = "*")
 public class AdminController {
 
     @Autowired
     private AppUserService appUserService;
     @Autowired
     private UserRepo userRepo;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
     private InvoiceService InvoiceService;
@@ -36,8 +41,8 @@ public class AdminController {
 
 
     @GetMapping("/users")
-    public ResponseEntity<List<AppUser>> getAllUsers(){
-        return ResponseEntity.ok( userRepo.findAll());
+    public ResponseEntity<List<UserSummaryDto>> getAllUsers(){
+        return ResponseEntity.ok(appUserService.getAllUsers());
     }
 
     @DeleteMapping("/users/{id}")
@@ -61,6 +66,21 @@ public class AdminController {
             userRepo.save(user);
         }
         return ResponseEntity.ok(user);
+    }
+
+    @PutMapping("/users/{id}/password")
+    public ResponseEntity<Void> changePassword(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        AppUser user = userRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        String newPassword = body.get("password");
+        if (newPassword == null || newPassword.length() < 8) {
+            return ResponseEntity.badRequest().build();
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepo.save(user);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/summary")

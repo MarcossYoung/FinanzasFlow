@@ -7,6 +7,8 @@ import com.example.demo.repository.InvoiceRepo;
 import com.example.demo.repository.PaymentScheduleRepo;
 import com.example.demo.repository.TenantRepo;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,6 +20,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
+@PreAuthorize("hasAuthority('SUPER_ADMIN')")
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/operator")
 public class OperatorController {
