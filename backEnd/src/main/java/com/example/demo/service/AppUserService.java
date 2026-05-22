@@ -59,8 +59,10 @@ public class AppUserService {
 
             if (password == null || !passwordEncoder.matches(password, foundUser.getPassword())) {
                 log.warn(
-                        "Login password mismatch for username='{}', storedHashPrefix='{}'",
+                        "Login password mismatch for username='{}', passwordProvided={}, passwordLength={}, storedHashPrefix='{}'",
                         username,
+                        password != null,
+                        password != null ? password.length() : 0,
                         passwordPrefix(foundUser.getPassword())
                 );
                 throw new BadCredentialsException("Invalid username or password");
