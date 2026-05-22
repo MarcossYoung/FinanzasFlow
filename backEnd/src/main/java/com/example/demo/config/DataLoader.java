@@ -28,6 +28,9 @@ public class DataLoader implements CommandLineRunner {
     @Value("${app.seed.demo-data:false}")
     private boolean seedDemoData;
 
+    @Value("${app.reset-seed-passwords:false}")
+    private boolean resetSeedPasswords;
+
     public DataLoader(InvoiceRepo InvoiceRepo, UserRepo userRepo, WorkOrderRepo workOrderRepo,
                       PaymentRepo paymentRepo, CostRepo costRepo,
                       TenantRepo tenantRepo,
@@ -79,6 +82,9 @@ public class DataLoader implements CommandLineRunner {
         });
         // Never overwrite an existing password — only update role/phone/tenant so
         // passwords changed via the admin panel survive restarts
+        if (resetSeedPasswords) {
+            user.setPassword(passwordEncoder.encode(rawPassword));
+        }
         user.setAppUserRole(role);
         user.setPhoneNumber(phone);
         user.setTenant(tenant);
