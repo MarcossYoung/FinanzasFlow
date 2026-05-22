@@ -48,6 +48,10 @@ public class UserController {
             Map<String, Object> response = appUserService.loginUser(username, user.getPassword());
             log.info("Login success for username='{}'", username);
             return ResponseEntity.ok(response);
+        } catch (IllegalStateException e) {
+            log.error("Login error for username='{}'", username, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Login service temporarily unavailable"));
         } catch (RuntimeException e) {
             log.warn("Login failed for username='{}': {}", username, e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

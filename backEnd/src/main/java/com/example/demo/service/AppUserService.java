@@ -10,6 +10,7 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -75,8 +76,10 @@ public class AppUserService {
 
             return response;
 
-        } catch (Exception e) {
+        } catch (BadCredentialsException | UsernameNotFoundException e) {
             throw new RuntimeException("Invalid username or password", e);
+        } catch (Exception e) {
+            throw new IllegalStateException("Login failed due to an internal authentication error", e);
         }
     }
 
