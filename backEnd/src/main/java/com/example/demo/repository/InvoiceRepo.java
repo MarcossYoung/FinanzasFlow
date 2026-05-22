@@ -51,7 +51,11 @@ public interface InvoiceRepo extends JpaRepository<Invoice, Long> {
 
     List<Invoice> findByFechaEstimadaBetween(LocalDate today, LocalDate endOfWeek);
 
+    List<Invoice> findByFechaEstimadaBetweenAndTenant_Id(LocalDate today, LocalDate endOfWeek, Long tenantId);
+
     List<Invoice> findByStartDateBetween(LocalDate from, LocalDate to);
+
+   Page<Invoice> findByTenant_Id(Long tenantId, Pageable pageable);
 
 
    @Query("""
@@ -64,6 +68,8 @@ public interface InvoiceRepo extends JpaRepository<Invoice, Long> {
 
    List<Invoice> findByWorkOrderStatus(Status status);
 
+   List<Invoice> findByWorkOrderStatusAndTenant_Id(Status status, Long tenantId);
+
    @Query("""
            SELECT p FROM Invoice p
            LEFT JOIN FETCH p.customer c
@@ -75,6 +81,20 @@ public interface InvoiceRepo extends JpaRepository<Invoice, Long> {
    List<Invoice> findOverdueOpenInvoices(@Param("today") LocalDate today);
 
    @Query("""
+           SELECT p FROM Invoice p
+           LEFT JOIN FETCH p.customer c
+           LEFT JOIN FETCH p.workOrder wo
+           WHERE p.tenant.id = :tenantId
+           AND COALESCE(p.fechaEntrega, p.fechaEstimada) < :today
+           AND (wo IS NULL OR wo.status <> com.example.demo.model.Status.CERRADO)
+           ORDER BY COALESCE(p.fechaEntrega, p.fechaEstimada) ASC
+           """)
+   List<Invoice> findOverdueOpenInvoicesByTenant(
+           @Param("today") LocalDate today,
+           @Param("tenantId") Long tenantId
+   );
+
+   @Query("""
            SELECT p FROM Invoice p LEFT JOIN p.workOrder wo
            WHERE (:titulo IS NULL OR LOWER(p.titulo) LIKE LOWER(CONCAT('%', :titulo, '%')))
            AND (:workOrderStatus IS NULL OR wo.status = :workOrderStatus)
@@ -84,6 +104,23 @@ public interface InvoiceRepo extends JpaRepository<Invoice, Long> {
    Page<Invoice> filterProducts(
            @Param("titulo") String titulo,
            @Param("workOrderStatus") Status workOrderStatus,
+           @Param("from") LocalDate from,
+           @Param("to") LocalDate to,
+           Pageable pageable
+   );
+
+   @Query("""
+           SELECT p FROM Invoice p LEFT JOIN p.workOrder wo
+           WHERE p.tenant.id = :tenantId
+           AND (:titulo IS NULL OR LOWER(p.titulo) LIKE LOWER(CONCAT('%', :titulo, '%')))
+           AND (:status IS NULL OR wo.status = :status)
+           AND (:from IS NULL OR p.startDate >= :from)
+           AND (:to IS NULL OR p.startDate <= :to)
+           """)
+   Page<Invoice> filterProductsByTenant(
+           @Param("tenantId") Long tenantId,
+           @Param("titulo") String titulo,
+           @Param("status") Status status,
            @Param("from") LocalDate from,
            @Param("to") LocalDate to,
            Pageable pageable

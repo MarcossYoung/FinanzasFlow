@@ -9,12 +9,12 @@ export default function OperatorPage() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
 
-	const token = localStorage.getItem('token');
-	const authHeader = { headers: { Authorization: `Bearer ${token}` } };
-
 	const fetchTenants = useCallback(async () => {
+		const token = localStorage.getItem('token');
 		try {
-			const res = await axios.get(`${BASE_URL}/api/operator/tenants`, authHeader);
+			const res = await axios.get(`${BASE_URL}/api/operator/tenants`, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
 			setTenants(res.data);
 		} catch {
 			setError('Error al cargar tenants.');
@@ -24,10 +24,11 @@ export default function OperatorPage() {
 	}, []);
 
 	const fetchActionQueue = useCallback(async (tenantId) => {
+		const token = localStorage.getItem('token');
 		try {
 			const res = await axios.get(
 				`${BASE_URL}/api/operator/tenants/${tenantId}/action-queue`,
-				authHeader,
+				{ headers: { Authorization: `Bearer ${token}` } },
 			);
 			setActionQueue(res.data);
 		} catch {

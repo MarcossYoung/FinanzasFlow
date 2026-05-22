@@ -140,7 +140,8 @@ public class InvoiceService {
     }
 
     public Page<InvoiceResponse> getAll(Pageable pageable) {
-        return InvoiceRepo.findAll(pageable).map(InvoiceResponse::from);
+        Long tenantId = currentTenantId();
+        return InvoiceRepo.findByTenant_Id(tenantId, pageable).map(InvoiceResponse::from);
     }
 
 
@@ -269,10 +270,11 @@ public class InvoiceService {
         InvoiceRepo.save(p);
     }
     public List<InvoiceResponse> getProductsDueThisWeek() {
+        Long tenantId = currentTenantId();
         LocalDate today = LocalDate.now().with(ChronoField.DAY_OF_WEEK, 1);
         LocalDate endOfWeek = today.plusDays(7);
 
-        List<Invoice> products = InvoiceRepo.findByFechaEstimadaBetween(today, endOfWeek);
+        List<Invoice> products = InvoiceRepo.findByFechaEstimadaBetweenAndTenant_Id(today, endOfWeek, tenantId);
 
         return products.stream()
                 .map(InvoiceResponse::from)
@@ -295,7 +297,8 @@ public class InvoiceService {
     }
 
     public List<InvoiceResponse> getProductsPastDue() {
-        List<Invoice> products = InvoiceRepo.findByWorkOrderStatus(Status.EN_DISPUTA);
+        Long tenantId = currentTenantId();
+        List<Invoice> products = InvoiceRepo.findByWorkOrderStatusAndTenant_Id(Status.EN_DISPUTA, tenantId);
 
         return products.stream()
                 .map(InvoiceResponse::from)
@@ -303,7 +306,8 @@ public class InvoiceService {
     }
 
     public List<InvoiceResponse> getProductsNotPickedUp(){
-        List<Invoice> products = InvoiceRepo.findByWorkOrderStatus(Status.PROMETIO_PAGO);
+        Long tenantId = currentTenantId();
+        List<Invoice> products = InvoiceRepo.findByWorkOrderStatusAndTenant_Id(Status.PROMETIO_PAGO, tenantId);
 
         return products.stream()
                 .map(InvoiceResponse::from)
@@ -324,9 +328,14 @@ public class InvoiceService {
 
         String tituloParam = (titulo != null && !titulo.isBlank()) ? titulo : null;
 
-        return InvoiceRepo.filterProducts(
-                tituloParam, workOrderStatus, fromDate, toDate, pageable
+        Long tenantId = currentTenantId();
+        return InvoiceRepo.filterProductsByTenant(
+                tenantId, tituloParam, workOrderStatus, fromDate, toDate, pageable
         ).map(InvoiceResponse::from);
+    }
+
+    private Long currentTenantId() {
+        return TenantContext.get();
     }
 
     private Tenant currentTenant() {
@@ -334,7 +343,6 @@ public class InvoiceService {
         if (tenantId != null) {
             return tenantRepo.findById(tenantId).orElse(null);
         }
-        return tenantRepo.findBySlug("muebleria-demo")
-                .orElseGet(() -> tenantRepo.findAll().stream().findFirst().orElse(null));
+        return tenantRepo.findAll().stream().findFirst().orElse(null);
     }
 }

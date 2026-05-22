@@ -92,6 +92,10 @@ public class AppUserService {
         user.setUsername(registration.getUsername());
         user.setPassword(passwordEncoder.encode(registration.getPassword()));
         user.setAppUserRole(registration.getAppUserRole() != null ? registration.getAppUserRole() : AppUserRole.GESTOR);
+        AppUser creator = getCurrentUser();
+        if (creator != null && creator.getTenant() != null) {
+            user.setTenant(creator.getTenant());
+        }
 
         return appUserRepository.save(user);
     }
@@ -131,6 +135,13 @@ public class AppUserService {
 
     public List<UserSummaryDto> getAllUsers() {
         return appUserRepository.findAll().stream()
+                .map(u -> new UserSummaryDto(u.getId(), u.getUsername(), u.getAppUserRole().name()))
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    public List<UserSummaryDto> getUsersForTenant(Long tenantId) {
+        return appUserRepository.findAll().stream()
+                .filter(u -> u.getTenant() != null && u.getTenant().getId().equals(tenantId))
                 .map(u -> new UserSummaryDto(u.getId(), u.getUsername(), u.getAppUserRole().name()))
                 .collect(java.util.stream.Collectors.toList());
     }

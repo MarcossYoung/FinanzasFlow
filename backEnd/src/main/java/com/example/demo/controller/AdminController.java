@@ -42,7 +42,11 @@ public class AdminController {
 
     @GetMapping("/users")
     public ResponseEntity<List<UserSummaryDto>> getAllUsers(){
-        return ResponseEntity.ok(appUserService.getAllUsers());
+        AppUser currentUser = appUserService.getCurrentUser();
+        Long tenantId = currentUser != null && currentUser.getTenant() != null
+                ? currentUser.getTenant().getId()
+                : null;
+        return ResponseEntity.ok(appUserService.getUsersForTenant(tenantId));
     }
 
     @DeleteMapping("/users/{id}")

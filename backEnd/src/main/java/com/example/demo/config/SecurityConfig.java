@@ -65,8 +65,8 @@ public class SecurityConfig {
                         // Existing public paths
                         .requestMatchers("/api/users/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/users/registro").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
-                        .requestMatchers("/api/payments", "/api/payments/**").permitAll()
-                        .requestMatchers("/api/workorders", "/api/workorders/**").permitAll()
+                        .requestMatchers("/api/payments", "/api/payments/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN", "GESTOR")
+                        .requestMatchers("/api/workorders", "/api/workorders/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN", "GESTOR")
 
                         // Invoice sub-routes that require auth (must come before the products permitAll catch-all)
                         .requestMatchers(HttpMethod.POST, "/api/telegram/webhook").permitAll()
