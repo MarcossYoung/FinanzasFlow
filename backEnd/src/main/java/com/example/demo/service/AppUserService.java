@@ -7,6 +7,8 @@ import com.example.demo.model.AppUserRole;
 import com.example.demo.repository.UserRepo;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -25,6 +27,8 @@ import java.util.*;
 
 @Service
 public class AppUserService {
+    private static final Logger log = LoggerFactory.getLogger(AppUserService.class);
+
     Authentication auth;
     private static final long EXPIRATION_TIME = 86400000;
     @Value("${jwt.secret}")
@@ -50,16 +54,24 @@ public class AppUserService {
 
     public Map<String, Object> loginUser(String username, String password) {
         try {
-            // Authenticate using Spring Security
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(username, password)
-            );
-
-            // Fetch user from DB
             AppUser foundUser = appUserRepository.findByUsername(username)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
+            if (password == null || !passwordEncoder.matches(password, foundUser.getPassword())) {
+                log.warn(
+                        "Login password mismatch for username='{}', storedHashPrefix='{}'",
+                        username,
+                        passwordPrefix(foundUser.getPassword())
+                );
+                throw new BadCredentialsException("Invalid username or password");
+            }
+
             // Set security context
+            Authentication authentication = new UsernamePasswordAuthenticationToken(
+                    foundUser,
+                    null,
+                    foundUser.getAuthorities()
+            );
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
             // Generate token
@@ -81,6 +93,13 @@ public class AppUserService {
         } catch (Exception e) {
             throw new IllegalStateException("Login failed due to an internal authentication error", e);
         }
+    }
+
+    private String passwordPrefix(String encodedPassword) {
+        if (encodedPassword == null || encodedPassword.length() < 4) {
+            return "<none>";
+        }
+        return encodedPassword.substring(0, 4);
     }
 
 
