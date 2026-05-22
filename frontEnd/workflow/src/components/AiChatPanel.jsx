@@ -17,6 +17,8 @@ export default function AiChatPanel() {
 		messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
 	}, [messages]);
 
+	if (location.pathname === '/login') return null;
+
 	// Only show for client-facing operators and admins.
 	if (!user || (user.role !== 'GESTOR' && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) return null;
 
