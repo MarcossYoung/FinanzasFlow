@@ -123,7 +123,7 @@ export default function InvoiceDetail() {
 				<section className='stat-card'>
 					<h3>Datos de factura</h3>
 					<p><strong>Cantidad:</strong> {invoice.cantidad || '-'}</p>
-					<p><strong>Emision:</strong> {invoice.startDate || '-'}</p>
+					<p><strong>Emisión:</strong> {invoice.startDate || '-'}</p>
 					<p><strong>Vencimiento:</strong> {invoice.fechaEntrega || invoice.fechaEstimada || '-'}</p>
 					<p><strong>Notas:</strong> {invoice.notas || '-'}</p>
 				</section>

@@ -15,11 +15,6 @@ export default function Sidebar() {
 	return (
 		<aside className='sidebar bg-gray-100 p-4 justifyContent'>
 			<div>
-				<div>
-					<NavLink to='/dashboard' className={linkClass}>
-						Facturas
-					</NavLink>
-				</div>
 				{(isAdmin || isGestor) && (
 					<div>
 						<NavLink to='/finance' className={linkClass}>
@@ -27,6 +22,11 @@ export default function Sidebar() {
 						</NavLink>
 					</div>
 				)}
+				<div>
+					<NavLink to='/dashboard' className={linkClass}>
+						Facturas
+					</NavLink>
+				</div>
 				{(isAdmin || isGestor) && (
 					<div>
 						<NavLink to='/customers' className={linkClass}>

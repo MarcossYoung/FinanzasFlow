@@ -14,7 +14,6 @@ import Loader from './loader';
 import Sidebar from './components/sidebar';
 import ProtectedRoute from './components/protectedRoute';
 import RoleRoute from './RoleRoute';
-import AiChatPanel from './components/AiChatPanel';
 import './css/styles.css';
 
 // --- LAZY LOADED VIEWS ---
@@ -41,7 +40,6 @@ function App() {
     return (
         <InvoicesProvider>
             <Router>
-                <AiChatPanel />
                 <Suspense fallback={<Loader />}>
                     <Routes>
                         {/* Public Routes */}
@@ -206,10 +204,18 @@ function App() {
                         />
 
                         {/* Redirects */}
-                        <Route path='/' element={<Navigate to='/dashboard' replace />} />
+                        <Route path='/' element={
+                            (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'GESTOR')
+                                ? <Navigate to='/finance' replace />
+                                : <Navigate to='/dashboard' replace />
+                        } />
                         <Route path='/products/:productId' element={<Navigate to='/dashboard' replace />} />
                         <Route path='/inventory' element={<Navigate to='/dashboard' replace />} />
-                        <Route path='*' element={<Navigate to='/dashboard' replace />} />
+                        <Route path='*' element={
+                            (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'GESTOR')
+                                ? <Navigate to='/finance' replace />
+                                : <Navigate to='/dashboard' replace />
+                        } />
                     </Routes>
                 </Suspense>
             </Router>

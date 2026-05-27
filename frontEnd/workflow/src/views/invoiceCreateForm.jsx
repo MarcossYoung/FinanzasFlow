@@ -292,7 +292,7 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 
 				<div className='input-row'>
 					<div className='input-group'>
-						<label>Fecha Emision</label>
+						<label>Fecha Emisión</label>
 						<input
 							type='date'
 							name='startDate'

@@ -4,7 +4,6 @@ import {
 	FaTrashAlt,
 	FaChevronLeft,
 	FaChevronRight,
-	FaFilter,
 	FaPlus,
 } from 'react-icons/fa';
 import {UserContext} from '../UserProvider';
@@ -27,7 +26,6 @@ export default function InvoicesTable({endpoint}) {
 	const [currentPage, setCurrentPage] = useState(0);
 	const [totalPages, setTotalPages] = useState(0);
 	const [searchTerm, setSearchTerm] = useState('');
-	const [showMySales, setShowMySales] = useState(false);
 	const [isModalOpen, setIsModalOpen] = useState(false);
 
 	const fetchInvoices = useCallback(async () => {
@@ -88,22 +86,40 @@ export default function InvoicesTable({endpoint}) {
 		return 'row-produccion';
 	};
 
-	const displayedInvoices = invoices
-		.filter((invoice) => {
-			if (!searchTerm) return true;
-			const search = searchTerm.toLowerCase();
-			return (
-				invoice.titulo?.toLowerCase().includes(search) ||
-				invoice.customerName?.toLowerCase().includes(search)
-			);
-		})
-		.filter((invoice) => {
-			if (!showMySales) return true;
-			return invoice.ownerId === user?.id || invoice.owner?.id === user?.id;
-		});
+	const displayedInvoices = invoices.filter((invoice) => {
+		if (!searchTerm) return true;
+		const search = searchTerm.toLowerCase();
+		return (
+			invoice.titulo?.toLowerCase().includes(search) ||
+			invoice.customerName?.toLowerCase().includes(search)
+		);
+	});
+	const isOnboardingEmpty = !loading && invoices.length === 0 && !searchTerm;
+
+	if (isOnboardingEmpty) {
+		return (
+			<div className='orders-view-container'>
+				<div className='invoice-empty-onboarding'>
+					{canEdit && (
+						<div className='invoice-empty-actions'>
+							<button
+								className='btn-pill invoice-empty-primary'
+								onClick={() => setIsModalOpen(true)}
+							>
+								<FaPlus size={12} />
+								Agregar primera factura
+							</button>
+						</div>
+					)}
+				</div>
+				<InvoiceCreationModal isOpen={isModalOpen} onClose={handleModalClose} />
+			</div>
+		);
+	}
 
 	return (
 		<div className='orders-view-container'>
+			{!isOnboardingEmpty && (
 			<div className='admin-tools'>
 				<input
 					type='text'
@@ -111,14 +127,6 @@ export default function InvoicesTable({endpoint}) {
 					value={searchTerm}
 					onChange={(e) => setSearchTerm(e.target.value)}
 				/>
-
-				<button
-					onClick={() => setShowMySales(!showMySales)}
-					className={`btn-pill ${showMySales ? 'active' : ''}`}
-				>
-					<FaFilter size={14} />
-					{showMySales ? 'Todas las facturas' : 'Ver mis facturas'}
-				</button>
 
 				{canEdit && (
 					<button
@@ -135,6 +143,7 @@ export default function InvoicesTable({endpoint}) {
 					</button>
 				)}
 			</div>
+			)}
 
 			<div className='table-wrapper full-height'>
 				{loading ? (
@@ -149,7 +158,7 @@ export default function InvoicesTable({endpoint}) {
 								<th>Titulo</th>
 								<th>Cliente</th>
 								<th>Cant.</th>
-								<th>Emision</th>
+								<th>Emisión</th>
 								<th>Vencimiento</th>
 								<th>Estado</th>
 								<th>Saldo</th>
@@ -200,12 +209,28 @@ export default function InvoicesTable({endpoint}) {
 								))
 							) : (
 								<tr>
-									<td
-										colSpan='9'
-										className='text-center'
-										style={{padding: '2rem', color: '#888'}}
-									>
-										No se encontraron facturas.
+									<td colSpan='9'>
+										{searchTerm ? (
+											<div style={{padding: '2rem', textAlign: 'center', color: '#888'}}>
+												No se encontraron resultados para esa búsqueda.
+											</div>
+										) : (
+											<div style={{padding: '3rem', textAlign: 'center'}}>
+												<p style={{color: '#888', marginBottom: '1rem', fontSize: '0.95rem'}}>
+													Todavía no hay facturas.
+												</p>
+												{canEdit && (
+													<button
+														className='btn-pill'
+														onClick={() => setIsModalOpen(true)}
+														style={{backgroundColor: '#00b894', color: 'white', border: 'none'}}
+													>
+														<FaPlus size={12} />
+														Nueva Factura
+													</button>
+												)}
+											</div>
+										)}
 									</td>
 								</tr>
 							)}
@@ -224,7 +249,7 @@ export default function InvoicesTable({endpoint}) {
 				</button>
 
 				<span>
-					Pagina <strong>{currentPage + 1}</strong> de {totalPages || 1}
+					Página <strong>{currentPage + 1}</strong> de {totalPages || 1}
 				</span>
 
 				<button

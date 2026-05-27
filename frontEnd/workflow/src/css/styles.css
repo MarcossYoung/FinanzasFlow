@@ -1,7 +1,7 @@
 /* =========================================
    1. FONTS & RESET
    ========================================= */
-@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 * {
 	box-sizing: border-box;
@@ -13,7 +13,7 @@ html {
 body {
 	margin: 0;
 	padding: 0;
-	font-family: 'Nunito Sans', sans-serif;
+	font-family: 'Inter', sans-serif;
 	background-color: #f7f9fc;
 	color: #2d3436;
 }
@@ -40,7 +40,7 @@ button,
 input,
 select,
 textarea {
-	font-family: 'Nunito Sans', sans-serif;
+	font-family: 'Inter', sans-serif;
 }
 
 /* =========================================
@@ -347,10 +347,10 @@ main,
 	width: 100%;
 }
 .main-title {
-	font-size: 2rem;
+	font-size: 1.25rem;
 	color: #2d3436;
 	margin-bottom: 1rem;
-	text-align: center;
+	text-align: left;
 }
 .dashboard-cards {
 	display: grid;
@@ -376,6 +376,31 @@ main,
 	font-weight: 800;
 	color: #00b894;
 	margin: 0;
+}
+
+.invoice-empty-onboarding {
+	min-height: 48vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: white;
+	border: 1px solid #e5e7eb;
+	border-radius: 8px;
+	margin-top: 1rem;
+	padding: 2rem;
+}
+
+.invoice-empty-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.75rem;
+}
+
+.invoice-empty-primary {
+	background-color: #00b894;
+	color: white;
+	border: none;
 }
 
 /* =========================================
@@ -787,7 +812,7 @@ main,
 	background-color: #fff;
 	transition: all 0.2s ease;
 	width: 100%;
-	font-family: 'Nunito Sans', sans-serif;
+	font-family: 'Inter', sans-serif;
 }
 
 .input-group input:focus,
@@ -1234,12 +1259,11 @@ main,
 		width: 100%;
 		padding: 0;
 		background: #fff;
-		font-family: 'Nunito Sans', Arial, sans-serif;
+		font-family: 'Inter', Arial, sans-serif;
 	}
 
 	.finance-actions,
-	.sidebar,
-	.ai-chat-panel {
+	.sidebar {
 		display: none !important;
 	}
 

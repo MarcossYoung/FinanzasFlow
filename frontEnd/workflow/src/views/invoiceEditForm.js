@@ -258,7 +258,7 @@ export default function InvoiceEditForm() {
 
 				<div className='input-row'>
 					<div className='input-group'>
-						<label>Fecha Emision</label>
+						<label>Fecha Emisión</label>
 						<input type='date' name='startDate' value={invoice.startDate || ''} onChange={handleChange} disabled />
 					</div>
 					<div className='input-group'>
