@@ -118,19 +118,21 @@ export default function Finance() {
 
 		return (
 			<div
+				className='fit-view finance-page'
 				style={{
-					padding: '25px',
+					padding: 0,
 					backgroundColor: 'var(--color-bg)',
-					minHeight: '100vh',
+					minHeight: 0,
 				}}
 			>
 				<div
+					className='finance-header'
 					style={{
 						display: 'flex',
 						gap: '12px',
 						justifyContent: 'space-between',
 						alignItems: 'center',
-						marginBottom: '30px',
+						marginBottom: 0,
 					}}
 				>
 					<h2 style={{margin: 0, color: '#2d3436'}}>Mis Finanzas</h2>
@@ -176,21 +178,23 @@ export default function Finance() {
 
 	// Admin view: full dashboard
 	return (
-		<div
-			style={{
-				padding: '25px',
+			<div
+				className='fit-view finance-page'
+				style={{
+				padding: 0,
 				backgroundColor: 'var(--color-bg)',
-				minHeight: '100vh',
+				minHeight: 0,
 			}}
 		>
 			{/* 1. Header & Month Selector */}
 			<div
+				className='finance-header'
 				style={{
 					display: 'flex',
 					gap: '12px',
 					justifyContent: 'space-between',
 					alignItems: 'center',
-					marginBottom: '30px',
+					marginBottom: 0,
 				}}
 			>
 				<h2 style={{margin: 0, color: '#2d3436'}}>Panel Financiero</h2>
@@ -213,9 +217,9 @@ export default function Finance() {
 			</div>
 
 			{/* 2. KPI Cards — Two-step profit */}
-			<div style={{ marginBottom: '30px' }}>
+			<div className='finance-kpi-stack' style={{marginBottom: 0}}>
 				{/* Row 1: Ingresos - COGS = Ganancia Bruta */}
-				<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '16px' }}>
+				<div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '12px'}}>
 					<StatCard title='Ingresos Totales' value={financeData.tInc}  borderColor='#00b894' />
 					<StatCard title='Efectivo Recibido' value={financeData.tDep}borderColor='#636e72' />
 					<StatCard
@@ -226,7 +230,7 @@ export default function Finance() {
 					/>
 				</div>
 				{/* Row 2: Ganancia Bruta - Gastos = Ganancia Neta */}
-				<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
+				<div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px'}}>
 					<StatCard title='Gastos Operativos' value={financeData.tExp} borderColor='#ff7675' />
 					<StatCard title='Ganancia Neta' value={financeData.netProfit}  borderColor='#6c5ce7' />
 				</div>
@@ -254,7 +258,7 @@ export default function Finance() {
 		</div>
 
 		{/* 3. Charts Section */}
-			<div style={{display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '25px'}}>
+			<div className='finance-chart-grid' style={{display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '16px'}}>
 				{/* User Performance (Bar Chart) */}
 				<div ref={barChartRef} className='panel'>
 					<h3 className='card-section-title'>Rendimiento por Cliente</h3>

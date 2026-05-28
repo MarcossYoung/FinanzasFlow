@@ -167,10 +167,10 @@ export default function CostsManager() {
 	);
 
 	return (
-		<div style={{padding: '25px', backgroundColor: 'var(--color-bg)', minHeight: '100vh'}}>
+		<div className='fit-view costs-page' style={{padding: 0, backgroundColor: 'var(--color-bg)', minHeight: 0}}>
 
 			{/* Header */}
-			<div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px'}}>
+			<div className='costs-header-row' style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0}}>
 				<h2 style={{margin: 0, color: '#2d3436'}}>Panel de Costos</h2>
 				<div style={{display: 'flex', gap: 12, alignItems: 'center'}}>
 					<select
@@ -191,7 +191,7 @@ export default function CostsManager() {
 			</div>
 
 			{/* KPI Cards */}
-			<div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '30px'}}>
+			<div className='costs-kpi-row' style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: 0}}>
 				<StatCard title='Total del Período' value={formatMoney(summary?.total)} icon='💸' borderColor='#e17055' />
 				<StatCard title='Registros' value={costs.length > 0 ? `${costs.length} gastos` : '-'} icon='📋' borderColor='#636e72' />
 				{topCategory && (
@@ -226,7 +226,7 @@ export default function CostsManager() {
 			</div>
 
 			{/* Pie Chart + Add Form */}
-			<div style={{display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '25px', marginBottom: '30px'}}>
+			<div className='costs-main-grid' style={{display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '16px', marginBottom: 0}}>
 
 				<div className='panel'>
 					<h3 className='card-section-title'>Distribución por Tipo</h3>
@@ -288,7 +288,7 @@ export default function CostsManager() {
 			</div>
 
 			{/* Costs Table */}
-			<div className='panel' style={{padding: 0, overflow: 'hidden'}}>
+			<div className='panel' style={{padding: 0, overflow: 'hidden', flexShrink: 0}}>
 				<div style={{padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--color-border-light)'}}>
 					<h3 style={{margin: 0, fontWeight: 700, color: 'var(--color-text)', fontSize: '0.95rem'}}>Gastos del Período</h3>
 				</div>

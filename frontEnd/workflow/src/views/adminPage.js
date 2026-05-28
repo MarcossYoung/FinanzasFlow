@@ -181,7 +181,7 @@ function AdminPage() {
 			)}
 
 			{/* 1. HEADER & KPI CARDS */}
-			<div className='dashboard-header' style={{marginBottom: '2rem'}}>
+			<div className='dashboard-header' style={{marginBottom: '1rem'}}>
 				<h1 className='main-title'>Panel de Administración</h1>
 
 				<div className='dashboard-cards'>
@@ -218,13 +218,11 @@ function AdminPage() {
 
 			{/* 2. MAIN GRID: CHART & USERS */}
 			{/* Usamos un grid simple para separar visualmente si hay espacio */}
-			<div
-				style={{display: 'flex', flexDirection: 'column', gap: '2rem'}}
-			>
+			<div className='admin-main-stack'>
 				{/* SECTION A: CHART */}
-				<div className='costs-wrapper' style={{marginTop: 0}}>
+				<div className='costs-wrapper admin-section-panel admin-chart-panel' style={{marginTop: 0}}>
 					<h2 style={{marginBottom: '1rem'}}>Resumen de Actividad</h2>
-					<div style={{width: '100%', height: 300}}>
+					<div style={{width: '100%', flex: 1, minHeight: 150}}>
 						<ResponsiveContainer>
 							<BarChart
 								data={chartData}
@@ -260,7 +258,7 @@ function AdminPage() {
 				</div>
 
 				{/* SECTION B: USER MANAGEMENT */}
-				<div className='costs-wrapper' style={{marginTop: 0}}>
+				<div className='costs-wrapper admin-section-panel' style={{marginTop: 0}}>
 					<div
 						className='flex justify-between align-center'
 						style={{
@@ -295,7 +293,7 @@ function AdminPage() {
 
 					{/* USERS TABLE */}
 					<div
-						className='table-wrapper'
+						className='table-wrapper admin-users-table'
 						style={{boxShadow: 'none', padding: 0, margin: 0}}
 					>
 						<table className='orders-table'>

@@ -9,14 +9,20 @@
 html {
 	line-height: 1.15;
 	-webkit-text-size-adjust: 100%;
+	height: 100%;
 }
 body {
 	margin: 0;
 	padding: 0;
 	font-family: 'Inter', sans-serif;
-	font-size: 16.5px;
+	font-size: 15px;
 	background-color: #f7f9fc;
 	color: #2d3436;
+	height: 100%;
+	overflow: hidden;
+}
+#root {
+	height: 100%;
 }
 h1,
 h2,
@@ -151,11 +157,14 @@ main,
 	width: calc(100% - var(--sidebar-width)) !important;
 
 	/* Reduced left padding to bring table closer to sidebar */
-	padding: 2rem 2rem 2rem 1rem;
+	padding: 1.25rem 1.5rem 1.25rem 1rem;
 
-	min-height: 100vh;
+	height: 100vh;
+	min-height: 0;
 	background-color: #f7f9fc;
-	overflow-x: hidden;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
 }
 
 /* Full width for Login page only */
@@ -176,9 +185,10 @@ main,
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center; /* Vertically center items */
-	gap: 1rem; /* Consistent spacing between input and button */
-	margin-bottom: 1.5rem;
+	gap: 0.75rem; /* Consistent spacing between input and button */
+	margin-bottom: 0.85rem;
 	width: 100%;
+	flex-shrink: 0;
 }
 
 /* Make inputs look nice next to buttons */
@@ -189,7 +199,7 @@ main,
 	padding: 0.7rem;
 	border: 1px solid #ddd;
 	border-radius: 8px;
-	height: 45px; /* Fixed height so buttons and inputs match */
+	height: 40px; /* Fixed height so buttons and inputs match */
 }
 
 /* Force buttons to same height as inputs */
@@ -202,7 +212,8 @@ main,
 	align-items: center;
 	justify-content: center;
 	white-space: nowrap;
-	padding: 0 1.5rem;
+	padding: 0 1.2rem;
+	font-size: 0.92rem;
 }
 /* --- Add Order Form (Toolbar Style) --- */
 .add-order-section {
@@ -268,7 +279,7 @@ main,
 	margin: 1rem 0;
 	width: 100%;
 
-	overflow-x: auto; /* Scroll only if absolutely necessary */
+	overflow: auto; /* Scroll only if absolutely necessary */
 
 	/* Make scrollbar prettier/thinner */
 	scrollbar-width: thin;
@@ -284,7 +295,7 @@ main,
 
 .orders-table th {
 	background-color: #f1f2f6 !important;
-	padding: 1rem;
+	padding: 0.72rem 0.85rem;
 	text-align: left;
 	color: #2d3436;
 	font-weight: 800;
@@ -296,7 +307,7 @@ main,
 }
 
 .orders-table td {
-	padding: 1rem;
+	padding: 0.68rem 0.85rem;
 	border-bottom: 1px solid #eee;
 	color: #2d3436;
 	font-weight: 600;
@@ -338,10 +349,11 @@ main,
 /* Dashboard Tabs */
 .dashboard-content nav {
 	display: flex;
-	gap: 1rem;
-	margin-bottom: 2rem;
+	gap: 0.75rem;
+	margin-bottom: 0.85rem;
 	border-bottom: 2px solid #e5e7eb;
 	padding-bottom: 0.5rem;
+	flex-shrink: 0;
 }
 .nav-pill {
 	padding: 0.6rem 1.2rem;
@@ -391,20 +403,20 @@ main,
 	width: 100%;
 }
 .main-title {
-	font-size: 1.35rem;
+	font-size: 1.2rem;
 	color: #2d3436;
-	margin-bottom: 1rem;
+	margin-bottom: 0.75rem;
 	text-align: left;
 }
 .dashboard-cards {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-	gap: 1.5rem;
-	margin-bottom: 2rem;
+	gap: 1rem;
+	margin-bottom: 1.25rem;
 }
 .card {
 	background: white;
-	padding: 1.5rem;
+	padding: 1rem;
 	border-radius: 12px;
 	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 	display: flex;
@@ -416,7 +428,7 @@ main,
 	margin-right: 1rem;
 }
 .card-info p {
-	font-size: 1.5rem;
+	font-size: 1.3rem;
 	font-weight: 800;
 	color: #00b894;
 	margin: 0;
@@ -570,21 +582,21 @@ main,
 	background: white;
 	border-radius: 12px;
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-	padding: 2rem;
+	padding: 1.25rem;
 	width: 100%;
 	margin-top: 1rem;
 }
 
 /* Header Section */
 .costs-header {
-	margin-bottom: 2rem;
+	margin-bottom: 1.25rem;
 	border-bottom: 1px solid #f1f2f6;
 	padding-bottom: 1rem;
 }
 
 .costs-header h2 {
 	color: #2d3436;
-	font-size: 1.5rem;
+	font-size: 1.25rem;
 	margin-bottom: 0.5rem;
 }
 
@@ -666,8 +678,9 @@ main,
 	display: flex;
 	justify-content: center;
 	align-items: center;
-	gap: 1.5rem;
+	gap: 1rem;
 	padding-top: 0.5rem;
+	padding-bottom: 0.25rem;
 }
 
 .btn-pagination {
@@ -753,6 +766,87 @@ main,
 	flex-direction: column;
 	gap: 0.5rem;
 	padding: 0;
+	flex: 1;
+	min-height: 0;
+}
+
+.tab-content {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.table-wrapper.full-height,
+.scrollable-table-panel {
+	flex: 1;
+	min-height: 0;
+	max-height: none;
+	overflow: auto;
+}
+
+.admin-dashboard .dashboard-header {
+	flex-shrink: 0;
+}
+
+.admin-main-stack {
+	flex: 1;
+	min-height: 0;
+	display: grid;
+	grid-template-rows: minmax(190px, 0.75fr) minmax(0, 1fr);
+	gap: 1rem;
+}
+
+.admin-section-panel {
+	min-height: 0;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+
+.admin-chart-panel {
+	min-height: 0;
+}
+
+.admin-users-table {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+}
+
+.fit-view {
+	height: 100%;
+	min-height: 0;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+
+.finance-page,
+.costs-page {
+	gap: 1rem;
+}
+
+.finance-header,
+.costs-header-row {
+	flex-shrink: 0;
+}
+
+.finance-kpi-stack,
+.costs-kpi-row {
+	flex-shrink: 0;
+}
+
+.finance-chart-grid,
+.costs-main-grid {
+	flex: 1;
+	min-height: 0;
+}
+
+.finance-chart-grid > .panel,
+.costs-main-grid > .panel {
+	min-height: 0;
+	overflow: auto;
 }
 
 /* =========================================
@@ -779,13 +873,13 @@ main,
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	margin-bottom: 2rem;
+	margin-bottom: 1.2rem;
 	border-bottom: 1px solid #f1f2f6;
 	padding-bottom: 1rem;
 }
 
 .form-header h2 {
-	font-size: 1.5rem;
+	font-size: 1.25rem;
 	color: #2d3436;
 	margin: 0;
 }
@@ -808,13 +902,13 @@ main,
 .creation-form {
 	display: flex;
 	flex-direction: column;
-	gap: 1.5rem;
+	gap: 0.9rem;
 }
 
 /* Filas de Inputs (para poner 2 en linea) */
 .input-row {
 	display: flex;
-	gap: 1.5rem;
+	gap: 1rem;
 	width: 100%;
 }
 
@@ -851,7 +945,7 @@ main,
 	padding: 0.8rem 1rem;
 	border: 1px solid #dfe6e9;
 	border-radius: 8px;
-	font-size: 1rem;
+	font-size: 0.95rem;
 	color: #2d3436;
 	background-color: #fff;
 	transition: all 0.2s ease;
@@ -869,7 +963,7 @@ main,
 
 /* Botón de Guardar */
 .submit-button {
-	margin-top: 1rem;
+	margin-top: 0.4rem;
 	background-color: #00b894;
 	color: white;
 	font-weight: 700;
@@ -992,6 +1086,10 @@ main,
 
 .customers-page {
 	width: 100%;
+	height: 100%;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
 }
 
 .customers-header {
@@ -1014,7 +1112,9 @@ main,
 	display: grid;
 	grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
 	gap: 1.25rem;
-	align-items: start;
+	align-items: stretch;
+	flex: 1;
+	min-height: 0;
 }
 
 .customer-form-panel,
@@ -1022,7 +1122,17 @@ main,
 	background: #fff;
 	border-radius: 8px;
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-	padding: 1.25rem;
+	padding: 1rem;
+	min-height: 0;
+}
+
+.customer-form-panel {
+	overflow: auto;
+}
+
+.customers-list-panel {
+	display: flex;
+	flex-direction: column;
 }
 
 .customer-form-panel .form-header {
@@ -1042,6 +1152,7 @@ main,
 	align-items: center;
 	justify-content: space-between;
 	margin-bottom: 1rem;
+	flex-shrink: 0;
 }
 
 .customer-search {
@@ -1070,6 +1181,10 @@ main,
 	margin: 0;
 	box-shadow: none;
 	border: 1px solid #f1f2f6;
+	flex: 1;
+	min-height: 0;
+	max-height: none;
+	overflow: auto;
 }
 
 .customers-table {
@@ -1334,7 +1449,7 @@ main,
 	background: var(--color-surface);
 	border-radius: var(--radius-md);
 	box-shadow: var(--shadow-sm);
-	padding: 1.5rem;
+	padding: 1rem;
 }
 
 /* Section header inside cards */
@@ -1352,8 +1467,8 @@ main,
 	background: var(--color-surface);
 	border-left: 5px solid #6c5ce7;
 	border-radius: var(--radius-md);
-	padding: 1.25rem 1.5rem;
-	margin-bottom: 1.75rem;
+	padding: 1rem 1.15rem;
+	margin-bottom: 1rem;
 	box-shadow: var(--shadow-sm);
 }
 
@@ -1389,8 +1504,8 @@ main,
 .ai-insight-text {
 	margin: 0;
 	color: var(--color-text-muted);
-	line-height: 1.6;
-	font-size: 0.95rem;
+	line-height: 1.45;
+	font-size: 0.9rem;
 }
 
 .ai-insight-placeholder {
@@ -1401,7 +1516,7 @@ main,
 
 /* StatCard — icon-optional layout */
 .stat-card {
-	padding: 1.25rem 1.5rem;
+	padding: 0.9rem 1rem;
 	display: flex;
 	align-items: center;
 	gap: 0;
@@ -1431,7 +1546,7 @@ main,
 
 .stat-card-value {
 	display: block;
-	font-size: 1.45rem;
+	font-size: 1.22rem;
 	font-weight: 800;
 	color: var(--color-text);
 	line-height: 1.2;
@@ -1487,6 +1602,9 @@ main,
 	.sidebar {
 		display: none;
 	}
+	body {
+		overflow: auto;
+	}
 	main,
 	.main-content,
 	.admin-dashboard,
@@ -1496,6 +1614,7 @@ main,
 	.product-wrapper,
 	.dashboard-content {
 		padding: 1rem;
+		overflow: auto;
 	}
 	.orders-table th,
 	.orders-table td {
