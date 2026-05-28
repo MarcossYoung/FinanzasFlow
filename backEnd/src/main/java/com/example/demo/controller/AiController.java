@@ -1,12 +1,8 @@
 package com.example.demo.controller;
 
-import com.example.demo.dto.ChatRequest;
 import com.example.demo.service.AiService;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.Map;
 
@@ -40,16 +36,7 @@ public class AiController {
         return ResponseEntity.ok(aiService.generateWeeklyDigest());
     }
 
-    // Integration 4: Streaming Chat
-    @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter chat(@RequestBody ChatRequest req, Authentication auth) {
-        SseEmitter emitter = new SseEmitter(120_000L);
-        String username = auth != null ? auth.getName() : "usuario";
-        aiService.streamChat(req, username, emitter);
-        return emitter;
-    }
-
-    // Integration 5: Parse Search Query
+    // Integration 4: Parse Search Query
     @PostMapping("/parse-search")
     public ResponseEntity<Map<String, Object>> parseSearch(@RequestBody Map<String, String> body) {
         return ResponseEntity.ok(aiService.parseSearchQuery(body.get("query")));

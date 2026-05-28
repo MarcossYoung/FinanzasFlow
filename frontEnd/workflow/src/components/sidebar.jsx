@@ -5,7 +5,7 @@ import {UserContext} from '../UserProvider';
 
 export default function Sidebar() {
 	const linkClass = ({isActive}) =>
-		`block p-2 rounded ${isActive ? 'bg-amber-200 font-bold' : ''}`;
+		isActive ? 'sidebar-link active' : 'sidebar-link';
 
 	const {user} = useContext(UserContext);
 	const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
@@ -13,51 +13,45 @@ export default function Sidebar() {
 	const isGestor = user?.role === 'GESTOR';
 
 	return (
-		<aside className='sidebar bg-gray-100 p-4 justifyContent'>
-			<div>
+		<aside className='sidebar'>
+			<div className='sidebar-brand'>FinanzasFlow</div>
+
+			<nav className='sidebar-nav'>
 				{(isAdmin || isGestor) && (
-					<div>
-						<NavLink to='/finance' className={linkClass}>
-							Finanzas
-						</NavLink>
-					</div>
-				)}
-				<div>
-					<NavLink to='/dashboard' className={linkClass}>
-						Facturas
+					<NavLink to='/finance' className={linkClass}>
+						Finanzas
 					</NavLink>
-				</div>
+				)}
+				<NavLink to='/dashboard' className={linkClass}>
+					Facturas
+				</NavLink>
 				{(isAdmin || isGestor) && (
-					<div>
-						<NavLink to='/customers' className={linkClass}>
-							Clientes
-						</NavLink>
-					</div>
+					<NavLink to='/customers' className={linkClass}>
+						Clientes
+					</NavLink>
 				)}
 				{isAdmin && (
-					<div>
-						<NavLink to='/costs' className={linkClass}>
-							Costos
-						</NavLink>
-					</div>
+					<NavLink to='/costs' className={linkClass}>
+						Costos
+					</NavLink>
 				)}
-			</div>
+				{isAdmin && (
+					<NavLink className={linkClass} to='/admin'>
+						Panel Admin
+					</NavLink>
+				)}
+				{isSuperAdmin && (
+					<NavLink className={linkClass} to='/operator'>
+						Operador
+					</NavLink>
+				)}
+			</nav>
 
-			{isAdmin && (
-				<NavLink className={linkClass} to='/admin'>
-					Panel Admin
+			<div className='sidebar-footer'>
+				<NavLink to={`/profile/${user.id}`} className={linkClass}>
+					Perfil
 				</NavLink>
-			)}
-			{isSuperAdmin && (
-				<NavLink className={linkClass} to='/operator'>
-					Operador
-				</NavLink>
-			)}
-
-			<div>
-				<NavLink to={`/profile/${user.id}`}>Perfil</NavLink>
 			</div>
 		</aside>
 	);
-
 }

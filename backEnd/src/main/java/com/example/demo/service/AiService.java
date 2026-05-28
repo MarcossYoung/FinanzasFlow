@@ -1,6 +1,5 @@
 package com.example.demo.service;
 
-import com.example.demo.dto.ChatRequest;
 import com.example.demo.dto.FinanceDashboardResponse;
 import com.example.demo.dto.InvoiceResponse;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -8,24 +7,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.WeekFields;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 @Service
@@ -197,94 +188,12 @@ public class AiService {
         return Map.of("digest", digest, "generatedAt", today.toString(), "week", currentWeek);
     }
 
-    public void streamChat(ChatRequest req, String username, SseEmitter emitter) {
-        String userRole = SecurityContextHolder.getContext().getAuthentication()
-                .getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .findFirst().orElse("GESTOR");
-
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        executor.submit(() -> {
-            try {
-                String pageContext = buildPageContext(req.page());
-
-                String system = String.format(
-                        "Eres el asistente de FinanzasFlow, una plataforma B2B para facturas, cobranzas, pagos, clientes y finanzas. " +
-                                "El usuario '%s' tiene rol '%s'. Responde siempre en espanol de forma concisa y operativa. " +
-                                "No uses contexto de muebles, taller, produccion ni inventario. Contexto de la pagina actual:\n%s",
-                        username, userRole, pageContext
-                );
-
-                List<Map<String, String>> messages = new ArrayList<>();
-                List<Map<String, String>> history = req.history();
-                if (history != null) {
-                    int start = Math.max(0, history.size() - 4);
-                    messages.addAll(history.subList(start, history.size()));
-                }
-                messages.add(Map.of("role", "user", "content", req.message()));
-
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("model", MODEL);
-                body.put("max_tokens", 500);
-                body.put("stream", true);
-                body.put("system", system);
-                body.put("messages", messages);
-
-                String bodyJson = objectMapper.writeValueAsString(body);
-
-                restTemplate.execute(
-                        ANTHROPIC_URL,
-                        HttpMethod.POST,
-                        request -> {
-                            request.getHeaders().set("x-api-key", apiKey);
-                            request.getHeaders().set("anthropic-version", "2023-06-01");
-                            request.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-                            request.getBody().write(bodyJson.getBytes(StandardCharsets.UTF_8));
-                        },
-                        response -> {
-                            try (BufferedReader reader = new BufferedReader(
-                                    new InputStreamReader(response.getBody(), StandardCharsets.UTF_8))) {
-                                String line;
-                                while ((line = reader.readLine()) != null) {
-                                    if (!line.startsWith("data: ")) continue;
-                                    String data = line.substring(6).trim();
-                                    if ("[DONE]".equals(data)) break;
-                                    try {
-                                        Map<String, Object> event = objectMapper.readValue(data, new TypeReference<>() {});
-                                        String type = (String) event.get("type");
-                                        if ("content_block_delta".equals(type)) {
-                                            @SuppressWarnings("unchecked")
-                                            Map<String, Object> delta = (Map<String, Object>) event.get("delta");
-                                            if (delta != null && "text_delta".equals(delta.get("type"))) {
-                                                String text = (String) delta.get("text");
-                                                if (text != null && !text.isEmpty()) {
-                                                    emitter.send(SseEmitter.event().data(text));
-                                                }
-                                            }
-                                        } else if ("message_stop".equals(type)) {
-                                            break;
-                                        }
-                                    } catch (Exception ignored) {
-                                    }
-                                }
-                            }
-                            return null;
-                        }
-                );
-                emitter.complete();
-            } catch (Exception e) {
-                emitter.completeWithError(e);
-            }
-        });
-        executor.shutdown();
-    }
-
     private String buildPageContext(String page) {
         try {
             if ("finance".equals(page)) {
                 LocalDate today = LocalDate.now();
                 FinanceDashboardResponse data = financeService.dashboard(today.withDayOfMonth(1), today);
-                return String.format("Pagina de finanzas. Importe facturado del mes: $%s, gastos: $%s, ganancia neta: $%s, efectivo cobrado: $%s",
+                return String.format("Página de finanzas. Importe facturado del mes: $%s, gastos: $%s, ganancia neta: $%s, efectivo cobrado: $%s",
                         data.tInc(), data.tExp(), data.netProfit(), data.tDep());
             } else if ("dashboard".equals(page)) {
                 int disputed = invoiceService.getProductsPastDue().size();

@@ -167,7 +167,7 @@ export default function CostsManager() {
 	);
 
 	return (
-		<div style={{padding: '25px', backgroundColor: '#f5f6fa', minHeight: '100vh'}}>
+		<div style={{padding: '25px', backgroundColor: 'var(--color-bg)', minHeight: '100vh'}}>
 
 			{/* Header */}
 			<div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px'}}>
@@ -205,28 +205,21 @@ export default function CostsManager() {
 			</div>
 
 			{/* AI Insight */}
-			<div style={{
-				background: 'white', borderLeft: '6px solid #6c5ce7', borderRadius: '12px',
-				padding: '20px 25px', marginBottom: '30px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-			}}>
-				<div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}}>
-					<h3 style={{margin: 0, color: '#2d3436', fontSize: '1rem'}}>Análisis IA</h3>
+			<div className='ai-insight-card'>
+				<div className='ai-insight-card-header'>
+					<h3 className='ai-insight-card-title'>Análisis IA</h3>
 					<button
+						className='ai-analyze-btn'
 						onClick={handleAnalyze}
 						disabled={aiLoading}
-						style={{
-							padding: '8px 18px', background: '#6c5ce7', color: 'white', border: 'none',
-							borderRadius: '8px', cursor: aiLoading ? 'not-allowed' : 'pointer',
-							opacity: aiLoading ? 0.7 : 1, fontSize: '0.875rem', fontWeight: '600',
-						}}
 					>
 						{aiLoading ? 'Analizando...' : 'Analizar'}
 					</button>
 				</div>
 				{aiInsight ? (
-					<p style={{margin: 0, color: '#636e72', lineHeight: '1.6', fontSize: '0.95rem'}}>{aiInsight}</p>
+					<p className='ai-insight-text'>{aiInsight}</p>
 				) : (
-					<p style={{margin: 0, color: '#b2bec3', fontSize: '0.875rem'}}>
+					<p className='ai-insight-placeholder'>
 						Haz clic en "Analizar" para obtener un resumen de los costos del período.
 					</p>
 				)}
@@ -235,16 +228,16 @@ export default function CostsManager() {
 			{/* Pie Chart + Add Form */}
 			<div style={{display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '25px', marginBottom: '30px'}}>
 
-				<div style={{background: 'white', padding: '25px', borderRadius: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)'}}>
-					<h3 style={{marginTop: 0, marginBottom: '20px', color: '#636e72'}}>Distribución por Tipo</h3>
+				<div className='panel'>
+					<h3 className='card-section-title'>Distribución por Tipo</h3>
 					{pieData.length > 0
 						? <ExpensePieChart data={pieData} />
 						: <p style={{color: '#b2bec3', textAlign: 'center', paddingTop: '2rem'}}>Sin datos para el período.</p>
 					}
 				</div>
 
-				<div style={{background: 'white', padding: '25px', borderRadius: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)'}}>
-					<h3 style={{marginTop: 0, marginBottom: '20px', color: '#636e72'}}>Registrar Nuevo Gasto</h3>
+				<div className='panel'>
+					<h3 className='card-section-title'>Registrar Nuevo Gasto</h3>
 					<form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: 14}}>
 						<div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12}}>
 							<div>
@@ -287,10 +280,7 @@ export default function CostsManager() {
 								</select>
 							</div>
 						</div>
-						<button type='submit' style={{
-							padding: '10px', background: '#00b894', color: 'white', border: 'none',
-							borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: '0.95rem',
-						}}>
+						<button type='submit' className='button-green' style={{height: 'auto', padding: '10px'}}>
 							Agregar Gasto
 						</button>
 					</form>
@@ -298,9 +288,9 @@ export default function CostsManager() {
 			</div>
 
 			{/* Costs Table */}
-			<div style={{background: 'white', borderRadius: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflow: 'hidden'}}>
-				<div style={{padding: '20px 25px', borderBottom: '1px solid #f0f3f4'}}>
-					<h3 style={{margin: 0, color: '#2d3436'}}>Gastos del Período</h3>
+			<div className='panel' style={{padding: 0, overflow: 'hidden'}}>
+				<div style={{padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--color-border-light)'}}>
+					<h3 style={{margin: 0, fontWeight: 700, color: 'var(--color-text)', fontSize: '0.95rem'}}>Gastos del Período</h3>
 				</div>
 				<table className='orders-table' style={{width: '100%'}}>
 					<thead>

@@ -1,41 +1,14 @@
-// Add this helper component to your Finance.jsx file
+// StatCard — icon is optional. When omitted the label+value fill the full card width.
 export default function StatCard({title, value, icon, borderColor}) {
 	return (
 		<div
-			className='card'
-			style={{
-				background: '#ffffff',
-				padding: '20px',
-				borderRadius: '10px',
-				borderLeft: `6px solid ${borderColor}`,
-				boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-				display: 'flex',
-				alignItems: 'center',
-				gap: '15px',
-			}}
+			className='card stat-card'
+			style={{borderLeft: `5px solid ${borderColor}`}}
 		>
-			<span style={{fontSize: '2rem'}}>{icon}</span>
-			<div>
-				<h4
-					style={{
-						margin: 0,
-						color: '#636e72',
-						fontSize: '0.8rem',
-						textTransform: 'uppercase',
-					}}
-				>
-					{title}
-				</h4>
-				<p
-					style={{
-						margin: '5px 0 0',
-						color: '#2d3436',
-						fontSize: '1.4rem',
-						fontWeight: 'bold',
-					}}
-				>
-					{value}
-				</p>
+			{icon && <span className='stat-card-icon'>{icon}</span>}
+			<div className='stat-card-body'>
+				<span className='stat-card-label'>{title}</span>
+				<strong className='stat-card-value'>{value}</strong>
 			</div>
 		</div>
 	);

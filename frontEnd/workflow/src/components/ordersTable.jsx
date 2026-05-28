@@ -17,6 +17,15 @@ const formatMoney = (value) =>
 		maximumFractionDigits: 0,
 	});
 
+const STATUS_LABELS = {
+	CERRADO:       'Cobrada',
+	EN_GESTION:    'En gestión',
+	PROMETIO_PAGO: 'Prometió pago',
+	EN_DISPUTA:    'En disputa',
+	INCOBRABLE:    'Incobrable',
+	CONTACTADO:    'Contactado',
+};
+
 export default function InvoicesTable({endpoint}) {
 	const {user} = useContext(UserContext);
 	const canEdit = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'GESTOR';
@@ -181,7 +190,13 @@ export default function InvoicesTable({endpoint}) {
 										<td>{invoice.cantidad || '-'}</td>
 										<td>{invoice.startDate || '-'}</td>
 										<td>{invoice.fechaEntrega || invoice.fechaEstimada || '-'}</td>
-										<td>{invoice.workOrderStatus || 'EN_GESTION'}</td>
+										<td>
+									<span
+										className={`status-badge status-${(invoice.workOrderStatus || 'EN_GESTION').toLowerCase().replace(/_/g, '-')}`}
+									>
+										{STATUS_LABELS[invoice.workOrderStatus] ?? invoice.workOrderStatus ?? 'En gestión'}
+									</span>
+								</td>
 										<td>
 											{formatMoney(
 												Number(invoice.precio || 0) -

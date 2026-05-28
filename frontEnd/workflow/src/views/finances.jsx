@@ -120,7 +120,7 @@ export default function Finance() {
 			<div
 				style={{
 					padding: '25px',
-					backgroundColor: '#f5f6fa',
+					backgroundColor: 'var(--color-bg)',
 					minHeight: '100vh',
 				}}
 			>
@@ -162,13 +162,11 @@ export default function Finance() {
 					<StatCard
 						title='Mis Ingresos'
 						value={myStats.income}
-						icon='💰'
 						borderColor='#00b894'
 					/>
 					<StatCard
 						title='Facturas'
 						value={myStats.unitsSold}
-						icon='🧾'
 						borderColor='#0984e3'
 					/>
 				</div>
@@ -181,7 +179,7 @@ export default function Finance() {
 		<div
 			style={{
 				padding: '25px',
-				backgroundColor: '#f5f6fa',
+				backgroundColor: 'var(--color-bg)',
 				minHeight: '100vh',
 			}}
 		>
@@ -218,113 +216,54 @@ export default function Finance() {
 			<div style={{ marginBottom: '30px' }}>
 				{/* Row 1: Ingresos - COGS = Ganancia Bruta */}
 				<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '16px' }}>
-					<StatCard title='Ingresos Totales' value={financeData.tInc} icon='💰' borderColor='#00b894' />
-					<StatCard title='Efectivo Recibido' value={financeData.tDep} icon='📥' borderColor='#636e72' />
+					<StatCard title='Ingresos Totales' value={financeData.tInc}  borderColor='#00b894' />
+					<StatCard title='Efectivo Recibido' value={financeData.tDep}borderColor='#636e72' />
 					<StatCard
 						title='Pendiente de Cobro'
 						value={Number(financeData.tInc || 0) - Number(financeData.tDep || 0)}
-						icon='⏳'
+						
 						borderColor='#e17055'
 					/>
 				</div>
 				{/* Row 2: Ganancia Bruta - Gastos = Ganancia Neta */}
 				<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
-					<StatCard title='Gastos Operativos' value={financeData.tExp} icon='💸' borderColor='#ff7675' />
-					<StatCard title='Ganancia Neta' value={financeData.netProfit} icon='📊' borderColor='#6c5ce7' />
+					<StatCard title='Gastos Operativos' value={financeData.tExp} borderColor='#ff7675' />
+					<StatCard title='Ganancia Neta' value={financeData.netProfit}  borderColor='#6c5ce7' />
 				</div>
 			</div>
 
 			{/* AI Insight Card */}
-		<div
-			style={{
-				background: 'white',
-				borderLeft: '6px solid #6c5ce7',
-				borderRadius: '12px',
-				padding: '20px 25px',
-				marginBottom: '30px',
-				boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-			}}
-		>
-			<div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}}>
-				<h3 style={{margin: 0, color: '#2d3436', fontSize: '1rem'}}>Análisis IA</h3>
+		<div className='ai-insight-card'>
+			<div className='ai-insight-card-header'>
+				<h3 className='ai-insight-card-title'>Análisis IA</h3>
 				<button
-						onClick={handleAnalyze}
-						disabled={aiLoading}
-						style={{
-							padding: '8px 18px',
-							background: '#6c5ce7',
-							color: 'white',
-							border: 'none',
-							borderRadius: '8px',
-							cursor: aiLoading ? 'not-allowed' : 'pointer',
-							opacity: aiLoading ? 0.7 : 1,
-							fontSize: '0.875rem',
-							fontWeight: '600',
-						}}
-					>
-						{aiLoading ? 'Analizando...' : 'Analizar'}
-					</button>
+					className='ai-analyze-btn'
+					onClick={handleAnalyze}
+					disabled={aiLoading}
+				>
+					{aiLoading ? 'Analizando...' : 'Analizar'}
+				</button>
 			</div>
 			{aiInsight ? (
-				<p style={{margin: 0, color: '#636e72', lineHeight: '1.6', fontSize: '0.95rem'}}>{aiInsight}</p>
+				<p className='ai-insight-text'>{aiInsight}</p>
 			) : (
-				<p style={{margin: 0, color: '#b2bec3', fontSize: '0.875rem'}}>
+				<p className='ai-insight-placeholder'>
 					Haz clic en "Analizar" para obtener un resumen inteligente del mes.
 				</p>
 			)}
 		</div>
 
 		{/* 3. Charts Section */}
-			<div
-				style={{
-					display: 'grid',
-					gridTemplateColumns: '1.5fr 1fr',
-					gap: '25px',
-				}}
-			>
+			<div style={{display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '25px'}}>
 				{/* User Performance (Bar Chart) */}
-				<div
-					ref={barChartRef}
-					className='card-white'
-					style={{
-						background: 'white',
-						padding: '25px',
-						borderRadius: '15px',
-						boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-					}}
-				>
-					<h3
-						style={{
-							marginTop: 0,
-							marginBottom: '20px',
-							color: '#636e72',
-						}}
-					>
-						Rendimiento por Cliente
-					</h3>
+				<div ref={barChartRef} className='panel'>
+					<h3 className='card-section-title'>Rendimiento por Cliente</h3>
 					<ComparisonBarChart data={financeData.customerStats || []} />
 				</div>
 
 				{/* Expense Breakdown (Pie Chart) */}
-				<div
-					ref={pieChartRef}
-					className='card-white'
-					style={{
-						background: 'white',
-						padding: '25px',
-						borderRadius: '15px',
-						boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-					}}
-				>
-					<h3
-						style={{
-							marginTop: 0,
-							marginBottom: '20px',
-							color: '#636e72',
-						}}
-					>
-						Distribución de Gastos
-					</h3>
+				<div ref={pieChartRef} className='panel'>
+					<h3 className='card-section-title'>Distribución de Gastos</h3>
 					<ExpensePieChart data={financeData.expenseBreakdown} />
 				</div>
 			</div>

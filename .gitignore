@@ -1,7 +1,5 @@
-CostAnalysis.txt
-FinanzasFlow.md
-refactorplan.md
-reworkplan.md
+
+plans/
 
 # build output
 backEnd/target/
