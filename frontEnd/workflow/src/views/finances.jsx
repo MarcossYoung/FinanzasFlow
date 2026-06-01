@@ -117,25 +117,9 @@ export default function Finance() {
 		) ?? {income: 0, unitsSold: 0};
 
 		return (
-			<div
-				className='fit-view finance-page'
-				style={{
-					padding: 0,
-					backgroundColor: 'var(--color-bg)',
-					minHeight: 0,
-				}}
-			>
-				<div
-					className='finance-header'
-					style={{
-						display: 'flex',
-						gap: '12px',
-						justifyContent: 'space-between',
-						alignItems: 'center',
-						marginBottom: 0,
-					}}
-				>
-					<h2 style={{margin: 0, color: '#2d3436'}}>Mis Finanzas</h2>
+			<div className='fit-view finance-page'>
+				<div className='finance-header page-header'>
+					<h2 className='page-title'>Mis Finanzas</h2>
 					<div className='finance-actions'>
 						<button className='btn-pill' type='button' onClick={handleExportPdf}>
 							Exportar PDF
@@ -144,23 +128,12 @@ export default function Finance() {
 							type='month'
 							value={selectedMonth}
 							onChange={(e) => setSelectedMonth(e.target.value)}
-							style={{
-								padding: '10px',
-								borderRadius: '8px',
-								border: '1px solid #dfe6e9',
-								boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-							}}
+							className='filter-input'
 						/>
 					</div>
 				</div>
 
-				<div
-					style={{
-						display: 'grid',
-						gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-						gap: '20px',
-					}}
-				>
+				<div className='kpi-grid'>
 					<StatCard
 						title='Mis Ingresos'
 						value={myStats.income}
@@ -178,26 +151,10 @@ export default function Finance() {
 
 	// Admin view: full dashboard
 	return (
-			<div
-				className='fit-view finance-page'
-				style={{
-				padding: 0,
-				backgroundColor: 'var(--color-bg)',
-				minHeight: 0,
-			}}
-		>
+		<div className='fit-view finance-page'>
 			{/* 1. Header & Month Selector */}
-			<div
-				className='finance-header'
-				style={{
-					display: 'flex',
-					gap: '12px',
-					justifyContent: 'space-between',
-					alignItems: 'center',
-					marginBottom: 0,
-				}}
-			>
-				<h2 style={{margin: 0, color: '#2d3436'}}>Panel Financiero</h2>
+			<div className='finance-header page-header'>
+				<h2 className='page-title'>Panel Financiero</h2>
 				<div className='finance-actions'>
 					<button className='btn-pill' type='button' onClick={handleExportPdf}>
 						Exportar PDF
@@ -206,20 +163,15 @@ export default function Finance() {
 						type='month'
 						value={selectedMonth}
 						onChange={(e) => setSelectedMonth(e.target.value)}
-						style={{
-							padding: '10px',
-							borderRadius: '8px',
-							border: '1px solid #dfe6e9',
-							boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-						}}
+						className='filter-input'
 					/>
 				</div>
 			</div>
 
 			{/* 2. KPI Cards — Two-step profit */}
-			<div className='finance-kpi-stack' style={{marginBottom: 0}}>
+			<div className='finance-kpi-stack'>
 				{/* Row 1: Ingresos - COGS = Ganancia Bruta */}
-				<div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '12px'}}>
+				<div className='kpi-grid finance-kpi-row'>
 					<StatCard title='Ingresos Totales' value={financeData.tInc}  borderColor='#00b894' />
 					<StatCard title='Efectivo Recibido' value={financeData.tDep}borderColor='#636e72' />
 					<StatCard
@@ -230,7 +182,7 @@ export default function Finance() {
 					/>
 				</div>
 				{/* Row 2: Ganancia Bruta - Gastos = Ganancia Neta */}
-				<div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px'}}>
+				<div className='kpi-grid'>
 					<StatCard title='Gastos Operativos' value={financeData.tExp} borderColor='#ff7675' />
 					<StatCard title='Ganancia Neta' value={financeData.netProfit}  borderColor='#6c5ce7' />
 				</div>
@@ -258,7 +210,7 @@ export default function Finance() {
 		</div>
 
 		{/* 3. Charts Section */}
-			<div className='finance-chart-grid' style={{display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '16px'}}>
+			<div className='finance-chart-grid'>
 				{/* User Performance (Bar Chart) */}
 				<div ref={barChartRef} className='panel'>
 					<h3 className='card-section-title'>Rendimiento por Cliente</h3>

@@ -167,16 +167,16 @@ export default function CostsManager() {
 	);
 
 	return (
-		<div className='fit-view costs-page' style={{padding: 0, backgroundColor: 'var(--color-bg)', minHeight: 0}}>
+		<div className='fit-view costs-page'>
 
 			{/* Header */}
-			<div className='costs-header-row' style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0}}>
-				<h2 style={{margin: 0, color: '#2d3436'}}>Panel de Costos</h2>
-				<div style={{display: 'flex', gap: 12, alignItems: 'center'}}>
+			<div className='page-header costs-header-row'>
+				<h2 className='page-title'>Panel de Costos</h2>
+				<div className='costs-controls'>
 					<select
 						value={selectedType}
 						onChange={(e) => {setSelectedType(e.target.value); setCurrentPage(0);}}
-						style={{padding: '10px', borderRadius: '8px', border: '1px solid #dfe6e9', boxShadow: '0 2px 4px rgba(0,0,0,0.05)'}}
+						className='filter-input'
 					>
 						<option value='ALL'>Todos los tipos</option>
 						{COST_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -185,20 +185,19 @@ export default function CostsManager() {
 						type='month'
 						value={selectedMonth}
 						onChange={(e) => {setSelectedMonth(e.target.value); setCurrentPage(0);}}
-						style={{padding: '10px', borderRadius: '8px', border: '1px solid #dfe6e9', boxShadow: '0 2px 4px rgba(0,0,0,0.05)'}}
+						className='filter-input'
 					/>
 				</div>
 			</div>
 
 			{/* KPI Cards */}
-			<div className='costs-kpi-row' style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: 0}}>
-				<StatCard title='Total del Período' value={formatMoney(summary?.total)} icon='💸' borderColor='#e17055' />
-				<StatCard title='Registros' value={costs.length > 0 ? `${costs.length} gastos` : '-'} icon='📋' borderColor='#636e72' />
+			<div className='kpi-grid costs-kpi-row'>
+				<StatCard title='Total del Período' value={formatMoney(summary?.total)} borderColor='#e17055' />
+				<StatCard title='Registros' value={costs.length > 0 ? `${costs.length} gastos` : '-'} borderColor='#636e72' />
 				{topCategory && (
 					<StatCard
 						title={`Mayor: ${typeLabel(topCategory.costType)}`}
 						value={formatMoney(topCategory.total)}
-						icon='📌'
 						borderColor='#fdcb6e'
 					/>
 				)}
@@ -226,53 +225,51 @@ export default function CostsManager() {
 			</div>
 
 			{/* Pie Chart + Add Form */}
-			<div className='costs-main-grid' style={{display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '16px', marginBottom: 0}}>
+			<div className='costs-main-grid'>
 
 				<div className='panel'>
 					<h3 className='card-section-title'>Distribución por Tipo</h3>
 					{pieData.length > 0
 						? <ExpensePieChart data={pieData} />
-						: <p style={{color: '#b2bec3', textAlign: 'center', paddingTop: '2rem'}}>Sin datos para el período.</p>
+						: <p className='empty-state-text'>Sin datos para el período.</p>
 					}
 				</div>
 
 				<div className='panel'>
 					<h3 className='card-section-title'>Registrar Nuevo Gasto</h3>
-					<form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: 14}}>
-						<div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12}}>
-							<div>
-								<label style={{fontSize: 12, color: '#636e72', display: 'block', marginBottom: 4}}>Fecha</label>
+					<form onSubmit={handleSubmit} className='costs-form'>
+						<div className='costs-form-row'>
+							<div className='input-group'>
+								<label>Fecha</label>
 								<input type='date' value={formData.date}
 									onChange={(e) => setFormData({...formData, date: e.target.value})}
-									required style={{width: '100%', padding: '8px', borderRadius: 8, border: '1px solid #dfe6e9'}} />
+									required />
 							</div>
-							<div>
-								<label style={{fontSize: 12, color: '#636e72', display: 'block', marginBottom: 4}}>Monto ($)</label>
+							<div className='input-group'>
+								<label>Monto ($)</label>
 								<input type='number' placeholder='0.00' value={formData.amount}
 									onChange={(e) => setFormData({...formData, amount: e.target.value})}
-									required style={{width: '100%', padding: '8px', borderRadius: 8, border: '1px solid #dfe6e9'}} />
+									required />
 							</div>
 						</div>
-						<div>
-							<label style={{fontSize: 12, color: '#636e72', display: 'block', marginBottom: 4}}>Asunto</label>
+						<div className='input-group'>
+							<label>Asunto</label>
 							<input type='text' placeholder='Ej: Pago de alquiler depósito' value={formData.reason}
 								onChange={(e) => setFormData({...formData, reason: e.target.value})}
-								required style={{width: '100%', padding: '8px', borderRadius: 8, border: '1px solid #dfe6e9'}} />
+								required />
 						</div>
-						<div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12}}>
-							<div>
-								<label style={{fontSize: 12, color: '#636e72', display: 'block', marginBottom: 4}}>Tipo</label>
+						<div className='costs-form-row'>
+							<div className='input-group'>
+								<label>Tipo</label>
 								<select value={formData.costType}
-									onChange={(e) => setFormData({...formData, costType: e.target.value})}
-									style={{width: '100%', padding: '8px', borderRadius: 8, border: '1px solid #dfe6e9'}}>
+									onChange={(e) => setFormData({...formData, costType: e.target.value})}>
 									{COST_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
 								</select>
 							</div>
-							<div>
-								<label style={{fontSize: 12, color: '#636e72', display: 'block', marginBottom: 4}}>Frecuencia</label>
+							<div className='input-group'>
+								<label>Frecuencia</label>
 								<select value={formData.frequency}
-									onChange={(e) => setFormData({...formData, frequency: e.target.value})}
-									style={{width: '100%', padding: '8px', borderRadius: 8, border: '1px solid #dfe6e9'}}>
+									onChange={(e) => setFormData({...formData, frequency: e.target.value})}>
 									<option value='ONE_TIME'>Única vez</option>
 									<option value='WEEKLY'>Semanal</option>
 									<option value='MONTHLY'>Mensual</option>
@@ -280,7 +277,7 @@ export default function CostsManager() {
 								</select>
 							</div>
 						</div>
-						<button type='submit' className='button-green' style={{height: 'auto', padding: '10px'}}>
+						<button type='submit' className='button-green'>
 							Agregar Gasto
 						</button>
 					</form>
@@ -288,11 +285,11 @@ export default function CostsManager() {
 			</div>
 
 			{/* Costs Table */}
-			<div className='panel' style={{padding: 0, overflow: 'hidden', flexShrink: 0}}>
-				<div style={{padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--color-border-light)'}}>
-					<h3 style={{margin: 0, fontWeight: 700, color: 'var(--color-text)', fontSize: '0.95rem'}}>Gastos del Período</h3>
+			<div className='panel costs-table-panel'>
+				<div className='costs-table-header'>
+					<h3 className='card-section-title'>Gastos del Período</h3>
 				</div>
-				<table className='orders-table' style={{width: '100%'}}>
+				<table className='orders-table'>
 					<thead>
 						<tr>
 							<th>Fecha</th>
@@ -305,17 +302,17 @@ export default function CostsManager() {
 					</thead>
 					<tbody>
 						{loading ? (
-							<tr><td colSpan='6' style={{textAlign: 'center', padding: '2rem'}}>Cargando...</td></tr>
+							<tr><td colSpan='6' className='empty-cell'>Cargando...</td></tr>
 						) : costs.length > 0 ? (
 							costs.map((c) =>
 								editingId === c.id ? (
-									<tr key={c.id} style={{background: '#f8f9fa'}}>
+									<tr key={c.id} className='table-edit-row'>
 										<td><input type='date' value={editForm.date}
 											onChange={(e) => setEditForm({...editForm, date: e.target.value})}
-											style={{width: '100%'}} /></td>
+											className='table-edit-input' /></td>
 										<td><input type='text' value={editForm.reason}
 											onChange={(e) => setEditForm({...editForm, reason: e.target.value})}
-											style={{width: '100%'}} /></td>
+											className='table-edit-input' /></td>
 										<td>
 											<select value={editForm.costType}
 												onChange={(e) => setEditForm({...editForm, costType: e.target.value})}>
@@ -324,7 +321,7 @@ export default function CostsManager() {
 										</td>
 										<td><input type='number' value={editForm.amount}
 											onChange={(e) => setEditForm({...editForm, amount: e.target.value})}
-											style={{width: '100%'}} /></td>
+											className='table-edit-input' /></td>
 										<td>
 											<select value={editForm.frequency}
 												onChange={(e) => setEditForm({...editForm, frequency: e.target.value})}>
@@ -335,7 +332,7 @@ export default function CostsManager() {
 											</select>
 										</td>
 										<td className='text-center'>
-											<div style={{display: 'flex', gap: 6, justifyContent: 'center'}}>
+											<div className='table-actions centered'>
 												<button className='button-green' onClick={() => saveEdit(c.id)}>Guardar</button>
 												<button className='btn-delete' onClick={() => setEditingId(null)}>Cancelar</button>
 											</div>
@@ -346,20 +343,20 @@ export default function CostsManager() {
 										<td>{c.date}</td>
 										<td>
 											{c.reason || '-'}
-											{c.reason?.endsWith('(Auto)') && <span style={{marginLeft: 6, fontSize: 12}}>🔁</span>}
+											{c.reason?.endsWith('(Auto)') && <span className='auto-recurring-icon'>🔁</span>}
 										</td>
-										<td><span className='badge OTRO'>{typeLabel(c.costType)}</span></td>
-										<td style={{fontWeight: 'bold'}}>{formatMoney(c.amount)}</td>
+										<td><span className='cost-type-badge'>{typeLabel(c.costType)}</span></td>
+										<td className='amount-cell'>{formatMoney(c.amount)}</td>
 										<td>
 											{c.frequency !== 'ONE_TIME' ? (
-												<span style={{background: '#dfe6e9', borderRadius: 12, padding: '2px 8px', fontSize: 12}}>
+												<span className='freq-badge'>
 													{freqLabel(c.frequency)}
 												</span>
 											) : 'Única vez'}
 										</td>
 										<td className='text-center'>
-											<div style={{display: 'flex', gap: 6, justifyContent: 'center'}}>
-												<button className='btn-pill' style={{fontSize: 12, padding: '4px 10px'}}
+											<div className='table-actions centered'>
+												<button className='btn-pill'
 													onClick={() => startEdit(c)}>Editar</button>
 												<button className='btn-delete' onClick={() => handleDelete(c.id)}>Eliminar</button>
 											</div>
@@ -368,31 +365,23 @@ export default function CostsManager() {
 								)
 							)
 						) : (
-							<tr><td colSpan='6' className='text-center' style={{padding: '2rem', color: '#888'}}>
+							<tr><td colSpan='6' className='empty-cell'>
 								No hay gastos para el período seleccionado.
 							</td></tr>
 						)}
 					</tbody>
 				</table>
 
-				<div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', padding: '20px'}}>
+				<div className='pagination-controls'>
 					<button disabled={currentPage === 0} onClick={() => setCurrentPage((p) => p - 1)}
-						className='btn-pagination' style={{
-							background: 'white', border: '1px solid #ddd', padding: '0.5rem 1rem',
-							borderRadius: 8, cursor: currentPage === 0 ? 'not-allowed' : 'pointer',
-							opacity: currentPage === 0 ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600,
-						}}>
+						className='btn-pagination'>
 						<FaChevronLeft /> Anterior
 					</button>
-					<span style={{fontWeight: 'bold', color: '#555'}}>
+					<span className='pagination-current'>
 						Página {currentPage + 1} de {totalPages || 1}
 					</span>
 					<button disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage((p) => p + 1)}
-						className='btn-pagination' style={{
-							background: 'white', border: '1px solid #ddd', padding: '0.5rem 1rem',
-							borderRadius: 8, cursor: currentPage >= totalPages - 1 ? 'not-allowed' : 'pointer',
-							opacity: currentPage >= totalPages - 1 ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600,
-						}}>
+						className='btn-pagination'>
 						Siguiente <FaChevronRight />
 					</button>
 				</div>

@@ -37,7 +37,7 @@ export default function Dashboard() {
 	return (
 		<div className='dashboard-layout flex'>
 			<main className='dashboard-content w-100 p-3'>
-				<nav style={{display: 'flex', gap: '10px'}}>
+				<nav>
 					{' '}
 					{/* Horizontal layout for links */}
 					{(isGestor || isAdmin) && (
