@@ -18,11 +18,11 @@ body {
 	font-size: 15px;
 	background-color: #f7f9fc;
 	color: #2d3436;
-	height: 100%;
-	overflow: hidden;
+	min-height: 100%;
+	overflow: auto;
 }
 #root {
-	height: 100%;
+	min-height: 100%;
 }
 h1,
 h2,
@@ -159,10 +159,9 @@ main,
 	/* Reduced left padding to bring table closer to sidebar */
 	padding: 1.25rem 1.5rem 1.25rem 1rem;
 
-	height: 100vh;
-	min-height: 0;
+	min-height: 100vh;
 	background-color: #f7f9fc;
-	overflow: hidden;
+	overflow: visible;
 	display: flex;
 	flex-direction: column;
 }
@@ -764,13 +763,11 @@ main,
 	flex-direction: column;
 	gap: 0.5rem;
 	padding: 0;
-	flex: 1;
-	min-height: 0;
+	flex: 0 0 auto;
 }
 
 .tab-content {
-	flex: 1;
-	min-height: 0;
+	flex: 0 0 auto;
 	display: flex;
 	flex-direction: column;
 }
@@ -788,34 +785,30 @@ main,
 }
 
 .admin-main-stack {
-	flex: 1;
-	min-height: 0;
+	flex: 0 0 auto;
 	display: grid;
-	grid-template-rows: minmax(190px, 0.75fr) minmax(0, 1fr);
+	grid-template-rows: auto auto;
 	gap: 1rem;
 }
 
 .admin-section-panel {
-	min-height: 0;
-	overflow: hidden;
+	overflow: visible;
 	display: flex;
 	flex-direction: column;
 }
 
 .admin-chart-panel {
-	min-height: 0;
+	min-height: auto;
 }
 
 .admin-users-table {
-	flex: 1;
-	min-height: 0;
-	overflow: auto;
+	flex: 0 0 auto;
+	overflow: visible;
 }
 
 .fit-view {
-	height: 100%;
-	min-height: 0;
-	overflow: hidden;
+	min-height: 100%;
+	overflow: visible;
 	display: flex;
 	flex-direction: column;
 }
@@ -837,14 +830,12 @@ main,
 
 .finance-chart-grid,
 .costs-main-grid {
-	flex: 1;
-	min-height: 0;
+	flex: 0 0 auto;
 }
 
 .finance-chart-grid > .panel,
 .costs-main-grid > .panel {
-	min-height: 0;
-	overflow: auto;
+	overflow: visible;
 }
 
 /* =========================================
@@ -1084,8 +1075,7 @@ main,
 
 .customers-page {
 	width: 100%;
-	height: 100%;
-	min-height: 0;
+	min-height: 100%;
 	display: flex;
 	flex-direction: column;
 }
@@ -1110,9 +1100,8 @@ main,
 	display: grid;
 	grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
 	gap: 1.25rem;
-	align-items: stretch;
-	flex: 1;
-	min-height: 0;
+	align-items: start;
+	flex: 0 0 auto;
 }
 
 .customer-form-panel,
@@ -1121,11 +1110,10 @@ main,
 	border-radius: 8px;
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 	padding: 1rem;
-	min-height: 0;
 }
 
 .customer-form-panel {
-	overflow: auto;
+	overflow: visible;
 }
 
 .customers-list-panel {
@@ -1179,8 +1167,7 @@ main,
 	margin: 0;
 	box-shadow: none;
 	border: 1px solid #f1f2f6;
-	flex: 1;
-	min-height: 0;
+	flex: 0 0 auto;
 	max-height: none;
 	overflow: auto;
 }
@@ -1551,7 +1538,7 @@ main,
 
 .costs-table-panel {
 	padding: 0;
-	overflow: hidden;
+	overflow: visible;
 	flex-shrink: 0;
 }
 
