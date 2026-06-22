@@ -1,18 +1,10 @@
 import React from 'react';
-import './css/styles.css'; // Assuming you have utility classes here
+import './css/styles.css';
 
 const Loader = () => (
-	<div
-		style={{
-			display: 'flex',
-			justifyContent: 'center',
-			alignItems: 'center',
-			height: '100vh',
-			color: '#636e72',
-		}}
-	>
-		<div className='loader-spinner'></div>
-		<h3 style={{marginLeft: '10px'}}>Cargando FinanzasFlow...</h3>
+	<div className='loader-layout'>
+		<div className='loader-spinner' aria-hidden='true'></div>
+		<h3 className='loader-title'>Cargando FinanzasFlow...</h3>
 	</div>
 );
 

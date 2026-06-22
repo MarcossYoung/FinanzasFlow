@@ -1,8 +1,13 @@
 package com.example.demo.controller;
 
+import com.example.demo.config.TenantContext;
+import com.example.demo.dto.CostCreateRequest;
 import com.example.demo.model.CostType;
 import com.example.demo.model.Costs;
+import com.example.demo.model.Tenant;
 import com.example.demo.repository.CostRepo;
+import com.example.demo.repository.TenantRepo;
+import com.example.demo.service.CostService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -20,11 +25,16 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/costs")
-@CrossOrigin(origins = "*")
 public class CostController {
 
     @Autowired
     private CostRepo costRepo;
+
+    @Autowired
+    private TenantRepo tenantRepo;
+
+    @Autowired
+    private CostService costService;
 
     @GetMapping
     public ResponseEntity<?> getAll(
@@ -35,15 +45,17 @@ public class CostController {
             @RequestParam(required = false) CostType costType
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "date"));
+        Long tenantId = currentTenantId();
         if (from != null && to != null) {
             LocalDate fromDate = LocalDate.parse(from);
             LocalDate toDate = LocalDate.parse(to);
             if (costType != null) {
-                return ResponseEntity.ok(costRepo.findByDateBetweenAndCostType(fromDate, toDate, costType, pageable));
+                return ResponseEntity.ok(costRepo.findByDateBetweenAndCostTypeAndTenant_Id(
+                        fromDate, toDate, costType, tenantId, pageable));
             }
-            return ResponseEntity.ok(costRepo.findByDateBetween(fromDate, toDate, pageable));
+            return ResponseEntity.ok(costRepo.findByDateBetweenAndTenant_Id(fromDate, toDate, tenantId, pageable));
         }
-        return ResponseEntity.ok(costRepo.findAll(pageable));
+        return ResponseEntity.ok(costRepo.findByTenant_Id(tenantId, pageable));
     }
 
     @GetMapping("/summary")
@@ -53,8 +65,9 @@ public class CostController {
     ) {
         LocalDate fromDate = LocalDate.parse(from);
         LocalDate toDate = LocalDate.parse(to);
-        BigDecimal total = costRepo.expensesTotal(fromDate, toDate);
-        List<Object[]> rows = costRepo.summaryByType(fromDate, toDate);
+        Long tenantId = currentTenantId();
+        BigDecimal total = costRepo.expensesTotal(tenantId, fromDate, toDate);
+        List<Object[]> rows = costRepo.summaryByType(tenantId, fromDate, toDate);
         List<Map<String, Object>> breakdown = rows.stream()
                 .map(row -> Map.<String, Object>of("costType", String.valueOf(row[0]), "total", row[1]))
                 .collect(Collectors.toList());
@@ -65,14 +78,13 @@ public class CostController {
     }
 
     @PostMapping
-    public Costs create(@RequestBody Costs cost) {
-        if (cost.getCreatedAt() == null) cost.setCreatedAt(LocalDateTime.now());
-        return costRepo.save(cost);
+    public Costs create(@RequestBody CostCreateRequest cost) {
+        return costService.create(cost);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<Costs> update(@PathVariable Long id, @RequestBody Costs updated) {
-        Costs existing = costRepo.findById(id).orElse(null);
+        Costs existing = costRepo.findByIdAndTenant_Id(id, currentTenantId()).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
         existing.setDate(updated.getDate());
         existing.setAmount(updated.getAmount());
@@ -84,7 +96,22 @@ public class CostController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id) {
-        costRepo.deleteById(id);
+        Costs existing = costRepo.findByIdAndTenant_Id(id, currentTenantId()).orElse(null);
+        if (existing == null) return ResponseEntity.notFound().build();
+        costRepo.delete(existing);
         return ResponseEntity.ok().build();
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContext.get();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant not available");
+        }
+        return tenantId;
+    }
+
+    private Tenant currentTenant() {
+        return tenantRepo.findById(currentTenantId())
+                .orElseThrow(() -> new RuntimeException("Tenant not found"));
     }
 }

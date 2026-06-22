@@ -16,7 +16,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin(origins = "*")
 public class UserController {
     private static final Logger log = LoggerFactory.getLogger(UserController.class);
 
@@ -34,6 +33,9 @@ public class UserController {
       try {
           AppUser regUser = appUserService.registerUser(user);
           return ResponseEntity.status(HttpStatus.CREATED).body(regUser);
+      } catch (IllegalArgumentException e) {
+          return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                  .body("Error: " + e.getMessage());
       } catch (Exception e) {
           return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                   .body("Error: " + e.getMessage());
@@ -62,7 +64,7 @@ public class UserController {
 
     @GetMapping("/{id}")
     public ResponseEntity<UserSummaryDto> getUser(@PathVariable Long id) {
-        AppUser u = appUserService.getUserById(id);
+        AppUser u = appUserService.getVisibleUserById(id);
         if (u == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(new UserSummaryDto(u.getId(), u.getUsername(), u.getAppUserRole().name()));
     }

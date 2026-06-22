@@ -10,6 +10,7 @@ import {
 	FaEdit,
 	FaCheck,
 	FaTimes,
+	FaKey,
 } from 'react-icons/fa';
 import {
 	BarChart,
@@ -44,6 +45,10 @@ function AdminPage() {
 	const [msg, setMsg] = useState({text: '', type: ''}); // Unified message state
 	const [editingUserId, setEditingUserId] = useState(null);
 	const [editingRole, setEditingRole] = useState('');
+	const [passwordUser, setPasswordUser] = useState(null);
+	const [newPassword, setNewPassword] = useState('');
+	const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+	const canChangeSuperadminPassword = currentUser?.role === 'SUPER_ADMIN';
 
 	// --- FETCH DATA ---
 	const fetchData = useCallback(async () => {
@@ -142,6 +147,29 @@ function AdminPage() {
 		}
 	};
 
+	const handleChangePassword = async (e) => {
+		e.preventDefault();
+		if (!passwordUser) return;
+		if (newPassword.length < 8) {
+			setMsg({text: 'La contraseña debe tener al menos 8 caracteres', type: 'red'});
+			return;
+		}
+		try {
+			const token = localStorage.getItem('token');
+			await axios.put(
+				`${BASE_URL}/api/admin/users/${passwordUser.id}/password`,
+				{password: newPassword},
+				{headers: {Authorization: `Bearer ${token}`}},
+			);
+			setMsg({text: 'Contraseña actualizada', type: 'green'});
+			setPasswordUser(null);
+			setNewPassword('');
+			setTimeout(() => setMsg({text: '', type: ''}), 3000);
+		} catch {
+			setMsg({text: 'No se pudo actualizar la contraseña', type: 'red'});
+		}
+	};
+
 	const dismissDigest = () => {
 		const now = new Date();
 		const year = now.getFullYear();
@@ -154,25 +182,14 @@ function AdminPage() {
 		<div className='admin-dashboard'>
 			{/* WEEKLY AI DIGEST BANNER */}
 			{digest && (
-				<div style={{
-					background: 'linear-gradient(135deg, #6c5ce7, #a29bfe)',
-					color: 'white',
-					borderRadius: '12px',
-					padding: '16px 20px',
-					marginBottom: '1.5rem',
-					display: 'flex',
-					justifyContent: 'space-between',
-					alignItems: 'flex-start',
-					gap: '12px',
-					boxShadow: '0 4px 12px rgba(108,92,231,0.3)',
-				}}>
+				<div className='admin-digest'>
 					<div>
-						<strong style={{fontSize: '0.85rem', opacity: 0.85}}>Resumen Semanal IA</strong>
-						<p style={{margin: '4px 0 0', fontSize: '0.95rem', lineHeight: '1.5'}}>{digest}</p>
+						<strong className='admin-digest-label'>Resumen Semanal IA</strong>
+						<p className='admin-digest-text'>{digest}</p>
 					</div>
 					<button
 						onClick={dismissDigest}
-						style={{background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.2rem', flexShrink: 0, padding: '0 4px'}}
+						className='admin-digest-close'
 						title='Cerrar'
 					>
 						×
@@ -181,7 +198,7 @@ function AdminPage() {
 			)}
 
 			{/* 1. HEADER & KPI CARDS */}
-			<div className='dashboard-header' style={{marginBottom: '1rem'}}>
+			<div className='dashboard-header admin-dashboard-header'>
 				<h1 className='main-title'>Panel de Administración</h1>
 
 				<div className='dashboard-cards'>
@@ -220,9 +237,9 @@ function AdminPage() {
 			{/* Usamos un grid simple para separar visualmente si hay espacio */}
 			<div className='admin-main-stack'>
 				{/* SECTION A: CHART */}
-				<div className='costs-wrapper admin-section-panel admin-chart-panel' style={{marginTop: 0}}>
-					<h2 style={{marginBottom: '1rem'}}>Resumen de Actividad</h2>
-					<div style={{width: '100%', flex: 1, minHeight: 150}}>
+				<div className='costs-wrapper admin-section-panel admin-chart-panel'>
+					<h2 className='admin-section-title'>Resumen de Actividad</h2>
+					<div className='admin-chart-container'>
 						<ResponsiveContainer>
 							<BarChart
 								data={chartData}
@@ -239,13 +256,7 @@ function AdminPage() {
 								/>
 								<XAxis dataKey='name' />
 								<YAxis />
-								<Tooltip
-									contentStyle={{
-										borderRadius: '8px',
-										border: 'none',
-										boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-									}}
-								/>
+								<Tooltip />
 								<Bar
 									dataKey='value'
 									fill='#00b894'
@@ -258,24 +269,14 @@ function AdminPage() {
 				</div>
 
 				{/* SECTION B: USER MANAGEMENT */}
-				<div className='costs-wrapper admin-section-panel' style={{marginTop: 0}}>
+				<div className='costs-wrapper admin-section-panel'>
 					<div
-						className='flex justify-between align-center'
-						style={{
-							marginBottom: '1.5rem',
-							display: 'flex',
-							justifyContent: 'space-between',
-						}}
+						className='admin-users-header'
 					>
 						<h2>Gestión de Usuarios</h2>
 						<button
 							className='button_3'
 							onClick={() => setShowUserModal(true)}
-							style={{
-								display: 'flex',
-								alignItems: 'center',
-								gap: '8px',
-							}}
 						>
 							<FaUserPlus /> Nuevo Usuario
 						</button>
@@ -284,8 +285,7 @@ function AdminPage() {
 					{/* Feedback Messages */}
 					{msg.text && (
 						<div
-							className={`add-order-message ${msg.type}`}
-							style={{marginBottom: '1rem'}}
+							className={`add-order-message admin-message ${msg.type}`}
 						>
 							{msg.text}
 						</div>
@@ -294,7 +294,6 @@ function AdminPage() {
 					{/* USERS TABLE */}
 					<div
 						className='table-wrapper admin-users-table'
-						style={{boxShadow: 'none', padding: 0, margin: 0}}
 					>
 						<table className='orders-table'>
 							<thead>
@@ -318,47 +317,24 @@ function AdminPage() {
 													<select
 														value={editingRole}
 														onChange={(e) => setEditingRole(e.target.value)}
-														style={{
-															padding: '4px 8px',
-															borderRadius: '6px',
-															border: '1px solid #b2bec3',
-															fontSize: '0.85rem',
-														}}
+														className='admin-role-select'
 													>
 														<option value='GESTOR'>GESTOR</option>
 														<option value='ADMIN'>ADMIN</option>
 													</select>
 												) : (
 													<span
-														className='badge'
-														style={{
-															background:
-																u.appUserRole === 'ADMIN' || u.appUserRole === 'SUPER_ADMIN'
-																	? '#e1bee7'
-																	: u.appUserRole === 'GESTOR'
-																	? '#fff3e0'
-																	: '#e0f2f1',
-															color:
-																u.appUserRole === 'ADMIN' || u.appUserRole === 'SUPER_ADMIN'
-																	? '#7b1fa2'
-																	: u.appUserRole === 'GESTOR'
-																	? '#e65100'
-																	: '#00695c',
-															padding: '4px 12px',
-															borderRadius: '20px',
-															fontSize: '0.85rem',
-														}}
+														className={`admin-role-badge admin-role-${u.appUserRole.toLowerCase().replace('_', '-')}`}
 													>
 														{u.appUserRole}
 													</span>
 												)}
 											</td>
-											<td className='text-center' style={{display: 'flex', gap: '6px', justifyContent: 'center'}}>
+											<td className='text-center admin-user-actions'>
 												{editingUserId === u.id ? (
 													<>
 														<button
-															className='btn-delete'
-															style={{color: '#00b894'}}
+															className='btn-delete admin-action-confirm'
 															onClick={() => handleEditRole(u.id)}
 															title='Confirmar'
 														>
@@ -375,8 +351,7 @@ function AdminPage() {
 												) : (
 													<>
 														<button
-															className='btn-delete'
-															style={{color: '#0984e3'}}
+															className='btn-delete admin-action-edit'
 															onClick={() => {
 																setEditingUserId(u.id);
 																setEditingRole(u.appUserRole);
@@ -385,6 +360,18 @@ function AdminPage() {
 														>
 															<FaEdit />
 														</button>
+														{canChangeSuperadminPassword && u.appUserRole === 'SUPER_ADMIN' && (
+															<button
+																className='btn-delete admin-action-password'
+																onClick={() => {
+																	setPasswordUser(u);
+																	setNewPassword('');
+																}}
+																title='Cambiar contraseña'
+															>
+																<FaKey />
+															</button>
+														)}
 														<button
 															className='btn-delete'
 															onClick={() => handleDeleteUser(u.id)}
@@ -401,8 +388,7 @@ function AdminPage() {
 									<tr>
 										<td
 											colSpan='4'
-											className='text-center'
-											style={{padding: '2rem'}}
+											className='text-center admin-empty-cell'
 										>
 											No se encontraron usuarios.
 										</td>
@@ -414,6 +400,53 @@ function AdminPage() {
 				</div>
 			</div>
 
+			{/* MODAL CAMBIAR CONTRASEÑA SUPERADMIN */}
+			{passwordUser && (
+				<div
+					className='modal-overlay'
+					onClick={() => setPasswordUser(null)}
+				>
+					<div
+						className='modal-content'
+						onClick={(e) => e.stopPropagation()}
+					>
+						<h2 className='admin-modal-title'>
+							Cambiar Contraseña
+						</h2>
+						<form
+							onSubmit={handleChangePassword}
+							className='form-input'
+						>
+							<div className='form-group'>
+								<label>Usuario</label>
+								<input
+									type='text'
+									value={passwordUser.username}
+									disabled
+								/>
+							</div>
+							<div className='form-group'>
+								<label>Nueva Contraseña</label>
+								<input
+									type='password'
+									value={newPassword}
+									onChange={(e) => setNewPassword(e.target.value)}
+									minLength='8'
+									required
+									autoFocus
+								/>
+							</div>
+							<button
+								type='submit'
+								className='button_3 margin-5 admin-modal-submit'
+							>
+								Actualizar Contraseña
+							</button>
+						</form>
+					</div>
+				</div>
+			)}
+
 			{/* MODAL CREAR USUARIO */}
 			{showUserModal && (
 				<div
@@ -424,7 +457,7 @@ function AdminPage() {
 						className='modal-content'
 						onClick={(e) => e.stopPropagation()}
 					>
-						<h2 style={{marginBottom: '1.5rem'}}>
+						<h2 className='admin-modal-title'>
 							Crear Nuevo Usuario
 						</h2>
 						<form
@@ -470,14 +503,7 @@ function AdminPage() {
 											appUserRole: e.target.value,
 										})
 									}
-									style={{
-										width: '100%',
-										padding: '0.8rem',
-										borderRadius: '6px',
-										border: '1px solid #333',
-										background: '#222',
-										color: 'white',
-									}}
+									className='admin-modal-role-select'
 								>
 									<option value='GESTOR'>
 										Gestor (Facturas y cobranzas)
@@ -490,8 +516,7 @@ function AdminPage() {
 
 							<button
 								type='submit'
-								className='button_3 margin-5'
-								style={{width: '100%', marginTop: '1rem'}}
+								className='button_3 margin-5 admin-modal-submit'
 							>
 								Confirmar Creación
 							</button>

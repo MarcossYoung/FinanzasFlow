@@ -22,6 +22,15 @@ public interface WorkOrderRepo extends JpaRepository<WorkOrder, Long> {
 """)
     List<WorkOrder> findByStatus(@Param("status") Status status);
 
+    @Query("""
+    SELECT w
+    FROM WorkOrder w
+    JOIN FETCH w.invoice p
+    WHERE p.tenant.id = :tenantId
+    AND w.status = :status
+""")
+    List<WorkOrder> findByTenantIdAndStatus(@Param("tenantId") Long tenantId, @Param("status") Status status);
+
     Optional<WorkOrder> findByInvoice_Id(Long invoiceId);
 
 
@@ -33,6 +42,25 @@ public interface WorkOrderRepo extends JpaRepository<WorkOrder, Long> {
 """)
     long countFechaEntrega(@Param("today") LocalDate today, @Param("endOfWeek") LocalDate endOfWeek);
 
+    @Query("""
+    SELECT COUNT(w)
+    FROM WorkOrder w
+    JOIN w.invoice p
+    WHERE p.tenant.id = :tenantId
+    AND p.fechaEntrega BETWEEN :today AND :endOfWeek
+""")
+    long countFechaEntregaByTenant(@Param("tenantId") Long tenantId,
+                                   @Param("today") LocalDate today,
+                                   @Param("endOfWeek") LocalDate endOfWeek);
+
+    @Query("""
+    SELECT w.status, COUNT(w)
+    FROM WorkOrder w
+    JOIN w.invoice p
+    WHERE p.tenant.id = :tenantId
+    GROUP BY w.status
+""")
+    List<Object[]> countOrdersByStatusForTenant(@Param("tenantId") Long tenantId);
 
 
 }

@@ -84,9 +84,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/invoices/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN", "GESTOR")
                         .requestMatchers("/api/operator/**").hasAuthority("SUPER_ADMIN")
 
-                        // Public Invoice routes
-                        .requestMatchers("/api/products", "/api/products/**", "/api/products/filter").permitAll()
-
                         // Existing restricted paths
                         .requestMatchers("/error").permitAll()
 

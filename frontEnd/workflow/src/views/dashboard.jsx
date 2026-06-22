@@ -13,7 +13,7 @@ export default function Dashboard() {
 	const linkClass = ({isActive}) =>
 		isActive ? 'nav-pill active' : 'nav-pill';
 
-	const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+	const isAdmin = user?.role === 'ADMIN';
 	const isGestor = user?.role === 'GESTOR';
 
 	useEffect(() => {
@@ -35,11 +35,9 @@ export default function Dashboard() {
 	}, [setInvoices]);
 
 	return (
-		<div className='dashboard-layout flex'>
-			<main className='dashboard-content w-100 p-3'>
+		<div className='dashboard-layout'>
+			<main className='dashboard-content w-100'>
 				<nav>
-					{' '}
-					{/* Horizontal layout for links */}
 					{(isGestor || isAdmin) && (
 						<NavLink to='/dashboard' end className={linkClass}>
 							Facturas

@@ -98,16 +98,16 @@ export default function InvoiceDetail() {
 	};
 
 	if (error) return <p className='error-text'>{error}</p>;
-	if (!invoice) return <p style={{padding: '2rem'}}>Cargando...</p>;
+	if (!invoice) return <p className='invoice-detail-loading'>Cargando...</p>;
 
 	const balance = Number(invoice.precio || 0) - Number(invoice.totalPaid || 0);
 
 	return (
-		<div className='p-6'>
-			<div className='orders-header' style={{alignItems: 'center'}}>
+		<div className='invoice-detail-page'>
+			<div className='orders-header invoice-detail-header'>
 				<div>
 					<h1 className='main-title'>Factura #{invoiceId}</h1>
-					<p style={{margin: 0, color: '#636e72'}}>{invoice.titulo}</p>
+					<p className='invoice-detail-subtitle'>{invoice.titulo}</p>
 				</div>
 				{canEdit && (
 					<button
@@ -119,7 +119,7 @@ export default function InvoiceDetail() {
 				)}
 			</div>
 
-			<div className='dashboard-grid' style={{display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))'}}>
+			<div className='invoice-detail-grid'>
 				<section className='stat-card'>
 					<h3>Datos de factura</h3>
 					<p><strong>Cantidad:</strong> {invoice.cantidad || '-'}</p>
@@ -142,7 +142,7 @@ export default function InvoiceDetail() {
 						value={invoice.workOrderStatus || 'EN_GESTION'}
 						onChange={(e) => updateStatus(e.target.value)}
 						disabled={!canEdit || !invoice.workOrderId}
-						style={{width: '100%', padding: 10, marginTop: 6}}
+						className='invoice-detail-status-select'
 					>
 						{statuses.map((status) => (
 							<option key={status} value={status}>{status}</option>
@@ -156,14 +156,14 @@ export default function InvoiceDetail() {
 					<p><strong>Cobrado:</strong> {formatMoney(invoice.totalPaid)}</p>
 					<p><strong>Saldo:</strong> {formatMoney(balance)}</p>
 					{canEdit && (
-						<form onSubmit={addPayment} style={{display: 'flex', gap: 8, marginTop: 12}}>
+						<form onSubmit={addPayment} className='invoice-payment-form'>
 							<input
 								type='number'
 								min='0'
 								placeholder='Monto'
 								value={payment.amount}
 								onChange={(e) => setPayment((prev) => ({...prev, amount: e.target.value}))}
-								style={{minWidth: 0, flex: 1}}
+								className='invoice-payment-amount'
 							/>
 							<select
 								value={payment.paymentType}
@@ -178,7 +178,7 @@ export default function InvoiceDetail() {
 				</section>
 			</div>
 
-			<section className='table-wrapper' style={{marginTop: 20}}>
+			<section className='table-wrapper invoice-detail-table'>
 				<table className='orders-table'>
 					<thead>
 						<tr>
@@ -200,7 +200,7 @@ export default function InvoiceDetail() {
 							))
 						) : (
 							<tr>
-								<td colSpan='4' style={{textAlign: 'center', padding: '2rem', color: '#888'}}>
+								<td colSpan='4' className='invoice-detail-empty-cell'>
 									Sin items cargados.
 								</td>
 							</tr>
@@ -209,7 +209,7 @@ export default function InvoiceDetail() {
 				</table>
 			</section>
 
-			<section className='table-wrapper' style={{marginTop: 20}}>
+			<section className='table-wrapper invoice-detail-table'>
 				<table className='orders-table'>
 					<thead>
 						<tr>
@@ -229,7 +229,7 @@ export default function InvoiceDetail() {
 							))
 						) : (
 							<tr>
-								<td colSpan='3' style={{textAlign: 'center', padding: '2rem', color: '#888'}}>
+								<td colSpan='3' className='invoice-detail-empty-cell'>
 									Sin pagos registrados.
 								</td>
 							</tr>

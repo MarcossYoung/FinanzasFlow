@@ -13,12 +13,11 @@ import Loader from './loader';
 // Keep these static because they are wrappers/layouts used immediately
 import Sidebar from './components/sidebar';
 import ProtectedRoute from './components/protectedRoute';
-import RoleRoute from './RoleRoute';
+import RoleRoute, {defaultRouteFor} from './RoleRoute';
 import './css/styles.css';
 
 // --- LAZY LOADED VIEWS ---
 const Login = lazy(() => import('./views/login'));
-const Register = lazy(() => import('./views/registro'));
 const Dashboard = lazy(() => import('./views/dashboard'));
 const Invoices = lazy(() => import('./views/invoicesAll'));
 const InvoiceDetail = lazy(() => import('./views/invoiceDetail'));
@@ -45,7 +44,6 @@ function App() {
                         {/* Public Routes */}
                         <Route path='/privacy-policy' element={<PrivacyPolicy />} />
                         <Route path='/login' element={<Login setUser={setUser} />} />
-                        <Route path='/registro' element={<Register />} />
 
                         {/* --- PROTECTED DASHBOARD LAYOUT --- */}
                         <Route
@@ -204,18 +202,8 @@ function App() {
                         />
 
                         {/* Redirects */}
-                        <Route path='/' element={
-                            (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'GESTOR')
-                                ? <Navigate to='/finance' replace />
-                                : <Navigate to='/dashboard' replace />
-                        } />
-                        <Route path='/products/:productId' element={<Navigate to='/dashboard' replace />} />
-                        <Route path='/inventory' element={<Navigate to='/dashboard' replace />} />
-                        <Route path='*' element={
-                            (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'GESTOR')
-                                ? <Navigate to='/finance' replace />
-                                : <Navigate to='/dashboard' replace />
-                        } />
+                        <Route path='/' element={<Navigate to={defaultRouteFor(user)} replace />} />
+                        <Route path='*' element={<Navigate to={defaultRouteFor(user)} replace />} />
                     </Routes>
                 </Suspense>
             </Router>

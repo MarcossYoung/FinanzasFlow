@@ -11,6 +11,14 @@ import java.util.Optional;
 public interface CustomerRepo extends JpaRepository<Customer, Long> {
     List<Customer> findByTenant_Id(Long tenantId);
 
+    Optional<Customer> findByIdAndTenant_Id(Long id, Long tenantId);
+
+    Optional<Customer> findFirstByTenant_IdAndCuitDniIgnoreCase(Long tenantId, String cuitDni);
+
+    Optional<Customer> findFirstByTenant_IdAndEmailIgnoreCase(Long tenantId, String email);
+
+    Optional<Customer> findFirstByTenant_IdAndNameIgnoreCase(Long tenantId, String name);
+
     @Query("""
             SELECT c FROM Customer c
             WHERE c.tenant.id = :tenantId

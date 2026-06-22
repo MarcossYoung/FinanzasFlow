@@ -37,8 +37,12 @@ public class CostAutomationService {
         LocalDate start = original.getDate();
 
         // Evitar duplicados: Si ya existe un gasto con el mismo asunto HOY, no lo creamos
-        boolean alreadyExists = costRepo.existsByDateAndReasonAndAmount(
-                today, original.getReason(), original.getAmount());
+        Long tenantId = original.getTenant() != null ? original.getTenant().getId() : null;
+        boolean alreadyExists = tenantId != null
+                ? costRepo.existsByDateAndReasonAndAmountAndTenant_Id(
+                        today, original.getReason(), original.getAmount(), tenantId)
+                : costRepo.existsByDateAndReasonAndAmount(
+                        today, original.getReason(), original.getAmount());
 
         if (alreadyExists) return false;
 
@@ -59,6 +63,7 @@ public class CostAutomationService {
 
     private void createCopy(Costs original, LocalDate today) {
         Costs newCost = new Costs();
+        newCost.setTenant(original.getTenant());
         newCost.setDate(today);
         newCost.setAmount(original.getAmount());
         newCost.setReason(original.getReason() + " (Auto)"); // Para identificarlo

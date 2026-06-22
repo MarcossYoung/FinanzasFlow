@@ -11,11 +11,15 @@ import com.example.demo.repository.CustomerRepo;
 import com.example.demo.repository.PaymentRepo;
 import com.example.demo.repository.InvoiceRepo;
 import com.example.demo.repository.TenantRepo;
+import com.example.demo.repository.UserRepo;
 import com.example.demo.repository.WorkOrderRepo;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
@@ -36,6 +40,7 @@ public class InvoiceService {
     private final PaymentRepo orderPaymentsRepo;
     private final CustomerRepo customerRepo;
     private final TenantRepo tenantRepo;
+    private final UserRepo userRepo;
     private final RestTemplate restTemplate;
 
     @Value("${n8n.webhook.product-created:}")
@@ -47,6 +52,7 @@ public class InvoiceService {
                           PaymentRepo orderPaymentsRepo,
                           CustomerRepo customerRepo,
                           TenantRepo tenantRepo,
+                          UserRepo userRepo,
                           RestTemplate restTemplate) {
         this.InvoiceRepo = InvoiceRepo;
         this.workOrderRepo = workOrderRepo;
@@ -54,28 +60,48 @@ public class InvoiceService {
         this.orderPaymentsRepo = orderPaymentsRepo;
         this.customerRepo = customerRepo;
         this.tenantRepo = tenantRepo;
+        this.userRepo = userRepo;
         this.restTemplate = restTemplate;
     }
 
     // ---------------- CREATE ----------------
 
+    @Transactional
     public InvoiceResponse createProduct(InvoiceCreateRequest req) {
+        AppUser owner = userService.getCurrentUser();
+        if (owner == null || owner.getTenant() == null) {
+            throw new IllegalStateException("Authenticated tenant owner is required");
+        }
+        return createInternal(req, owner.getTenant(), owner);
+    }
+
+    @Transactional
+    public InvoiceResponse createForTenant(InvoiceCreateRequest req, Long tenantId, Long ownerId) {
+        Tenant tenant = tenantRepo.findById(tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
+        AppUser owner = userRepo.findByIdAndTenant_Id(ownerId, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("Owner does not belong to tenant"));
+        return createInternal(req, tenant, owner);
+    }
+
+    private InvoiceResponse createInternal(InvoiceCreateRequest req, Tenant tenant, AppUser owner) {
         Invoice p = new Invoice();
 
         p.setTitulo(req.titulo());
         p.setCantidad(req.cantidad() != null ? req.cantidad() : 0L);
-        p.setStartDate(LocalDate.now());
+        p.setStartDate(req.startDate() != null ? req.startDate() : LocalDate.now());
         p.setFechaEntrega(req.fechaEntrega());
-        p.setFechaEstimada(LocalDate.now().plusDays(35));
+        p.setFechaEstimada(req.fechaEstimada() != null
+                ? req.fechaEstimada()
+                : (req.fechaEntrega() != null ? req.fechaEntrega() : p.getStartDate().plusDays(35)));
         p.setFoto(req.foto());
         p.setNotas(req.notas());
-        AppUser owner = userService.getCurrentUser();
-        if (owner == null) owner = userService.getFirstUser();
         p.setOwner(owner);
-        Tenant tenant = owner != null && owner.getTenant() != null ? owner.getTenant() : currentTenant();
         p.setTenant(tenant);
         if (req.customerId() != null) {
-            customerRepo.findById(req.customerId()).ifPresent(p::setCustomer);
+            Customer customer = customerRepo.findByIdAndTenant_Id(req.customerId(), tenant.getId())
+                    .orElseThrow(() -> new IllegalArgumentException("Customer does not belong to tenant"));
+            p.setCustomer(customer);
         }
         p.setClientPhone(req.clientPhone());
         replaceLineItems(p, req.lineItems());
@@ -108,23 +134,35 @@ public class InvoiceService {
             orderPaymentsRepo.save(deposit);
         }
 
-        // Fire N8N webhook (non-blocking, best-effort)
-        fireN8nWebhook(saved);
+        scheduleN8nWebhookAfterCommit(saved);
 
         return InvoiceResponse.from(saved);
     }
 
-    private void fireN8nWebhook(Invoice p) {
+    private void scheduleN8nWebhookAfterCommit(Invoice p) {
         if (n8nWebhookUrl == null || n8nWebhookUrl.isBlank()) return;
-        try {
-            Map<String, Object> payload = Map.of(
+        Map<String, Object> payload = Map.of(
                 "invoiceId", p.getId(),
                 "titulo", p.getTitulo() != null ? p.getTitulo() : "",
                 "clientPhone", p.getClientPhone() != null ? p.getClientPhone() : "",
                 "precio", p.getPrecio(),
                 "startDate", p.getStartDate().toString(),
                 "fechaEstimada", p.getFechaEstimada() != null ? p.getFechaEstimada().toString() : ""
-            );
+        );
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            fireN8nWebhook(payload);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                fireN8nWebhook(payload);
+            }
+        });
+    }
+
+    private void fireN8nWebhook(Map<String, Object> payload) {
+        try {
             restTemplate.postForObject(n8nWebhookUrl, payload, String.class);
         } catch (Exception e) {
             // log but don't fail Invoice creation
@@ -134,8 +172,7 @@ public class InvoiceService {
     // ---------------- READ (unchanged) ----------------
 
     public InvoiceResponse getById(long id) throws ResourceNotFoundException {
-        Invoice p = InvoiceRepo.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found with ID: " + id));
+        Invoice p = findOwnedInvoice(id);
         return InvoiceResponse.from(p);
     }
 
@@ -148,8 +185,7 @@ public class InvoiceService {
     // ---------------- UPDATE ----------------
 
     public InvoiceResponse update(Long id, InvoiceUpdateDto dto) throws ResourceNotFoundException {
-        Invoice Invoice = InvoiceRepo.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found with ID: " + id));
+        Invoice Invoice = findOwnedInvoice(id);
 
         applyProductUpdates(Invoice, dto);
 
@@ -177,7 +213,7 @@ public class InvoiceService {
         if (dto.getCantidad() != null) Invoice.setCantidad(dto.getCantidad());
         if (dto.getClientPhone() != null) Invoice.setClientPhone(dto.getClientPhone());
         if (dto.getCustomerId() != null) {
-            customerRepo.findById(dto.getCustomerId()).ifPresent(Invoice::setCustomer);
+            customerRepo.findByIdAndTenant_Id(dto.getCustomerId(), currentTenantId()).ifPresent(Invoice::setCustomer);
         }
         if (dto.getLineItems() != null) {
             replaceLineItems(Invoice, dto.getLineItems());
@@ -251,13 +287,12 @@ public class InvoiceService {
     // ---------------- DELETE ----------------
 
     public boolean delete(Long id) throws ResourceNotFoundException {
-        Invoice Invoice = InvoiceRepo.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found with ID: " + id));
+        Invoice Invoice = findOwnedInvoice(id);
 
         workOrderRepo.findByInvoice_Id(id).ifPresent(workOrderRepo::delete);
 
         // delete ALL payments for this Invoice (OneToMany)
-        List<OrderPayments> payments = orderPaymentsRepo.findAllByInvoice_Id(id);
+        List<OrderPayments> payments = orderPaymentsRepo.findAllByInvoice_IdAndTenant_Id(id, currentTenantId());
         if (!payments.isEmpty()) {
             orderPaymentsRepo.deleteAll(payments);
         }
@@ -282,18 +317,24 @@ public class InvoiceService {
     }
 
     public long countOrders() {
-        return InvoiceRepo.count();
+        Long tenantId = currentTenantId();
+        return tenantId == null ? InvoiceRepo.count() : InvoiceRepo.countByTenant_Id(tenantId);
     }
 
 
 
     public List<Object[]> findTopProducts() {
-        return InvoiceRepo.findTopOrders();
+        Long tenantId = currentTenantId();
+        return tenantId == null ? InvoiceRepo.findTopOrders() : InvoiceRepo.findTopOrdersByTenant(tenantId);
     }
-    public Invoice findByTitle(String title) { return InvoiceRepo.findByTitulo(title) .orElseThrow(() -> new RuntimeException("Invoice not found")); }
+    public Invoice findByTitle(String title) {
+        Long tenantId = currentTenantId();
+        return InvoiceRepo.findByTituloAndTenant_Id(title, tenantId)
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+    }
 
     public Page<InvoiceResponse> searchByTitle(String query, Pageable pageable) {
-        return InvoiceRepo.searchByTitulo(query, pageable).map(InvoiceResponse::from);
+        return InvoiceRepo.searchByTituloAndTenant(query, currentTenantId(), pageable).map(InvoiceResponse::from);
     }
 
     public List<InvoiceResponse> getProductsPastDue() {
@@ -336,6 +377,15 @@ public class InvoiceService {
 
     private Long currentTenantId() {
         return TenantContext.get();
+    }
+
+    private Invoice findOwnedInvoice(Long id) throws ResourceNotFoundException {
+        Long tenantId = currentTenantId();
+        if (tenantId == null) {
+            throw new ResourceNotFoundException("Invoice not found with ID: " + id);
+        }
+        return InvoiceRepo.findByIdAndTenant_Id(id, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found with ID: " + id));
     }
 
     private Tenant currentTenant() {

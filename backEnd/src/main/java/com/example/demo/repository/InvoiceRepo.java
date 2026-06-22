@@ -34,8 +34,14 @@ public interface InvoiceRepo extends JpaRepository<Invoice, Long> {
     @Query("SELECT p FROM Invoice p WHERE LOWER(p.titulo) LIKE LOWER(CONCAT('%', :query, '%')) ")
     Page<Invoice> searchByTitulo(@Param("query") String query, Pageable pageable);
 
+    @Query("SELECT p FROM Invoice p WHERE p.tenant.id = :tenantId AND LOWER(p.titulo) LIKE LOWER(CONCAT('%', :query, '%')) ")
+    Page<Invoice> searchByTituloAndTenant(@Param("query") String query, @Param("tenantId") Long tenantId, Pageable pageable);
+
     @Query("SELECT p FROM Invoice p WHERE LOWER(p.titulo) LIKE LOWER(:titulo)")
     Optional<Invoice> findByTitulo(@Param("titulo") String titulo);
+
+    @Query("SELECT p FROM Invoice p WHERE p.tenant.id = :tenantId AND LOWER(p.titulo) LIKE LOWER(:titulo)")
+    Optional<Invoice> findByTituloAndTenant_Id(@Param("titulo") String titulo, @Param("tenantId") Long tenantId);
 
 
     @Query(value = """
@@ -55,7 +61,13 @@ public interface InvoiceRepo extends JpaRepository<Invoice, Long> {
 
     List<Invoice> findByStartDateBetween(LocalDate from, LocalDate to);
 
+    List<Invoice> findByStartDateBetweenAndTenant_Id(LocalDate from, LocalDate to, Long tenantId);
+
    Page<Invoice> findByTenant_Id(Long tenantId, Pageable pageable);
+
+   Optional<Invoice> findByIdAndTenant_Id(Long id, Long tenantId);
+
+   long countByTenant_Id(Long tenantId);
 
 
    @Query("""
@@ -64,6 +76,14 @@ public interface InvoiceRepo extends JpaRepository<Invoice, Long> {
                JOIN WorkOrder w ON w.invoice = p
                GROUP BY w.status""")
    List<Object[]> findTopOrders();
+
+   @Query("""
+               SELECT w.status, COUNT(p)
+               FROM Invoice p
+               JOIN WorkOrder w ON w.invoice = p
+               WHERE p.tenant.id = :tenantId
+               GROUP BY w.status""")
+   List<Object[]> findTopOrdersByTenant(@Param("tenantId") Long tenantId);
 
 
    List<Invoice> findByWorkOrderStatus(Status status);

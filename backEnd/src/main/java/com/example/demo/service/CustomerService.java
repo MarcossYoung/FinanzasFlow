@@ -40,14 +40,16 @@ public class CustomerService {
     }
 
     public CustomerResponse update(Long id, CustomerCreateRequest req) {
-        Customer customer = customerRepo.findById(id)
+        Customer customer = customerRepo.findByIdAndTenant_Id(id, tenantId())
                 .orElseThrow(() -> new RuntimeException("Customer not found: " + id));
         apply(customer, req);
         return CustomerResponse.from(customerRepo.save(customer));
     }
 
     public void delete(Long id) {
-        customerRepo.deleteById(id);
+        Customer customer = customerRepo.findByIdAndTenant_Id(id, tenantId())
+                .orElseThrow(() -> new RuntimeException("Customer not found: " + id));
+        customerRepo.delete(customer);
     }
 
     private void apply(Customer customer, CustomerCreateRequest req) {

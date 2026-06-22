@@ -28,8 +28,7 @@ import java.util.Map;
 import java.util.Set;
 
 @RestController
-@RequestMapping({"/api/products", "/api/invoices"})
-@CrossOrigin(origins = "*")
+@RequestMapping("/api/invoices")
 public class InvoiceController {
 
     @Autowired
@@ -105,6 +104,9 @@ public class InvoiceController {
         String ext = name.contains(".") ? name.substring(name.lastIndexOf('.') + 1).toLowerCase() : "";
         if (!Set.of("jpg", "jpeg", "png", "webp").contains(ext)) {
             return ResponseEntity.badRequest().body(Map.of("error", "Solo se permiten jpg, jpeg, png, webp"));
+        }
+        if (!Set.of("image/jpeg", "image/png", "image/webp").contains(file.getContentType())) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Tipo de contenido no permitido"));
         }
         try {
             String url = fileStorageService.saveFile(file);

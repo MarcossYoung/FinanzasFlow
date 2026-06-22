@@ -48,6 +48,7 @@ export default function CostsManager() {
 
 	const [editingId, setEditingId] = useState(null);
 	const [editForm, setEditForm] = useState({});
+	const [showManualForm, setShowManualForm] = useState(false);
 
 	const [formData, setFormData] = useState({
 		date: new Date().toISOString().split('T')[0],
@@ -224,7 +225,7 @@ export default function CostsManager() {
 				)}
 			</div>
 
-			{/* Pie Chart + Add Form */}
+			{/* Reporting chart + manual correction disclosure */}
 			<div className='costs-main-grid'>
 
 				<div className='panel'>
@@ -235,9 +236,16 @@ export default function CostsManager() {
 					}
 				</div>
 
-				<div className='panel'>
-					<h3 className='card-section-title'>Registrar Nuevo Gasto</h3>
-					<form onSubmit={handleSubmit} className='costs-form'>
+				<div className='panel manual-entry-panel'>
+					<button
+						type='button'
+						className='manual-entry-disclosure'
+						onClick={() => setShowManualForm((visible) => !visible)}
+						aria-expanded={showManualForm}
+					>
+						Agregar o corregir manualmente
+					</button>
+					{showManualForm && <form onSubmit={handleSubmit} className='costs-form manual-entry-form'>
 						<div className='costs-form-row'>
 							<div className='input-group'>
 								<label>Fecha</label>
@@ -280,7 +288,7 @@ export default function CostsManager() {
 						<button type='submit' className='button-green'>
 							Agregar Gasto
 						</button>
-					</form>
+					</form>}
 				</div>
 			</div>
 

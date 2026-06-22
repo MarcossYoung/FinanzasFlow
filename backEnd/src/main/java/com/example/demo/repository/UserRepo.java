@@ -16,7 +16,9 @@ import java.util.Optional;
 public interface UserRepo extends JpaRepository<AppUser, Long> {
      AppUser getById(Long id);
 
-     Optional<AppUser> findByUsername(String username);
+    Optional<AppUser> findByUsername(String username);
+
+    Optional<AppUser> findByIdAndTenant_Id(Long id, Long tenantId);
 
     Page<AppUser> findAll(Pageable pageable);
 

@@ -9,12 +9,19 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 public interface PaymentRepo extends JpaRepository<OrderPayments, Long> {
 
     List<OrderPayments> findByInvoice_Id(Long invoiceId);
 
+    List<OrderPayments> findByInvoice_IdAndTenant_Id(Long invoiceId, Long tenantId);
+
     List<OrderPayments> findByPaymentDateBetween(LocalDate from, LocalDate to);
+
+    List<OrderPayments> findByPaymentDateBetweenAndTenant_Id(LocalDate from, LocalDate to, Long tenantId);
+
+    Optional<OrderPayments> findByIdAndTenant_Id(Long id, Long tenantId);
 
     // FIX: Standardized to use 'fecha' and 'valor'
     @Query(value = """
@@ -51,4 +58,6 @@ public interface PaymentRepo extends JpaRepository<OrderPayments, Long> {
                              @Param("to") LocalDate to);
 
     List<OrderPayments> findAllByInvoice_Id(Long id);
+
+    List<OrderPayments> findAllByInvoice_IdAndTenant_Id(Long id, Long tenantId);
 }

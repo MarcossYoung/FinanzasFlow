@@ -2,6 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.UserSummaryDto;
 import com.example.demo.model.AppUser;
+import com.example.demo.model.AppUserRole;
 import com.example.demo.model.Status;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.example.demo.repository.UserRepo;
@@ -9,6 +10,7 @@ import com.example.demo.service.AppUserService;
 import com.example.demo.service.InvoiceService;
 import com.example.demo.service.WorkOrderService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -22,7 +24,6 @@ import java.util.Map;
 @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
 @RestController
 @RequestMapping("/api/admin")
-@CrossOrigin(origins = "*")
 public class AdminController {
 
     @Autowired
@@ -66,7 +67,12 @@ public class AdminController {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         String role = body.get("appUserRole");
         if (role != null && !role.isBlank()) {
-            user.setAppUserRole(com.example.demo.model.AppUserRole.valueOf(role));
+            AppUser currentUser = appUserService.getCurrentUser();
+            AppUserRole requestedRole = AppUserRole.valueOf(role);
+            if (!canManageRole(currentUser, user, requestedRole)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+            user.setAppUserRole(requestedRole);
             userRepo.save(user);
         }
         return ResponseEntity.ok(user);
@@ -76,8 +82,12 @@ public class AdminController {
     public ResponseEntity<Void> changePassword(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
+        AppUser currentUser = appUserService.getCurrentUser();
         AppUser user = userRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        if (!canManagePassword(currentUser, user)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         String newPassword = body.get("password");
         if (newPassword == null || newPassword.length() < 8) {
             return ResponseEntity.badRequest().build();
@@ -87,26 +97,60 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
+    private boolean canManagePassword(AppUser currentUser, AppUser targetUser) {
+        if (currentUser == null || currentUser.getAppUserRole() == null) return false;
+        if (targetUser.getAppUserRole() == AppUserRole.SUPER_ADMIN) {
+            return currentUser.getAppUserRole() == AppUserRole.SUPER_ADMIN;
+        }
+        if (currentUser.getAppUserRole() == AppUserRole.SUPER_ADMIN) return true;
+        return currentUser.getTenant() != null
+                && targetUser.getTenant() != null
+                && currentUser.getTenant().getId().equals(targetUser.getTenant().getId());
+    }
+
+    private boolean canManageRole(AppUser currentUser, AppUser targetUser, AppUserRole requestedRole) {
+        if (currentUser == null || currentUser.getAppUserRole() == null) return false;
+        if (currentUser.getAppUserRole() == AppUserRole.SUPER_ADMIN) return true;
+        if (targetUser.getAppUserRole() == AppUserRole.SUPER_ADMIN || requestedRole == AppUserRole.SUPER_ADMIN) {
+            return false;
+        }
+        return currentUser.getTenant() != null
+                && targetUser.getTenant() != null
+                && currentUser.getTenant().getId().equals(targetUser.getTenant().getId());
+    }
+
     @GetMapping("/summary")
     public ResponseEntity<Map<String, Object>> getSummary() {
         Map<String, Object> summary = new HashMap<>();
 
         // === 1. Total Users ===
-        long totalUsers = appUserService.countUsers();
+        AppUser currentUser = appUserService.getCurrentUser();
+        Long tenantId = currentUser != null && currentUser.getTenant() != null
+                ? currentUser.getTenant().getId()
+                : null;
+        long totalUsers = tenantId != null
+                ? appUserService.getUsersForTenant(tenantId).size()
+                : appUserService.countUsers();
 
         // === 2. Total Orders ===
         long totalOrders = InvoiceService.countOrders();
 
         // === 3. Finished Orders ===
-        long finishedOrders = workOrderService.countByType(Status.CERRADO);
+        long finishedOrders = tenantId != null
+                ? workOrderService.countByTypeForTenant(Status.CERRADO, tenantId)
+                : workOrderService.countByType(Status.CERRADO);
 
         // === 4. Due This Week ===
         LocalDate today = LocalDate.now();
         LocalDate endOfWeek = today.plusDays(7);
-        long dueThisWeek = workOrderService.countDueBetween(today, endOfWeek);
+        long dueThisWeek = tenantId != null
+                ? workOrderService.countDueBetweenForTenant(tenantId, today, endOfWeek)
+                : workOrderService.countDueBetween(today, endOfWeek);
 
         // === 5. Orders by Status ===
-        Map<String, Long> ordersByStatus = workOrderService.countOrdersByStatus();
+        Map<String, Long> ordersByStatus = tenantId != null
+                ? workOrderService.countOrdersByStatusForTenant(tenantId)
+                : workOrderService.countOrdersByStatus();
 
 
         // === 7. Top Products ===

@@ -13,16 +13,30 @@ import org.springframework.data.repository.query.Param;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface CostRepo extends JpaRepository<Costs, Long> {
 
     List<Costs> findByDateBetween(LocalDate from, LocalDate to);
 
+    List<Costs> findByDateBetweenAndTenant_Id(LocalDate from, LocalDate to, Long tenantId);
+
     Page<Costs> findByDateBetween(LocalDate from, LocalDate to, Pageable pageable);
+
+    Page<Costs> findByTenant_Id(Long tenantId, Pageable pageable);
+
+    Page<Costs> findByDateBetweenAndTenant_Id(LocalDate from, LocalDate to, Long tenantId, Pageable pageable);
 
     Page<Costs> findByDateBetweenAndCostType(LocalDate from, LocalDate to, CostType costType, Pageable pageable);
 
+    Page<Costs> findByDateBetweenAndCostTypeAndTenant_Id(
+            LocalDate from, LocalDate to, CostType costType, Long tenantId, Pageable pageable);
+
     boolean existsByDateAndReasonAndAmount(LocalDate date, String reason, BigDecimal amount);
+
+    boolean existsByDateAndReasonAndAmountAndTenant_Id(LocalDate date, String reason, BigDecimal amount, Long tenantId);
+
+    Optional<Costs> findByIdAndTenant_Id(Long id, Long tenantId);
 
     // This query is used by FinanceService.dashboard()
     // Using 'valor' and 'fecha' to match your @Column annotations exactly
@@ -37,9 +51,10 @@ public interface CostRepo extends JpaRepository<Costs, Long> {
     List<MonthlyAmountRow> expensesByDate(@Param("from") LocalDate from,
                                           @Param("to") LocalDate to);
 
-    @Query(value = "SELECT COALESCE(SUM(c.valor), 0) FROM costos c WHERE c.fecha BETWEEN :from AND :to",
+    @Query(value = "SELECT COALESCE(SUM(c.valor), 0) FROM costos c WHERE c.tenant_id = :tenantId AND c.fecha BETWEEN :from AND :to",
             nativeQuery = true)
-    BigDecimal expensesTotal(@Param("from") LocalDate from,
+    BigDecimal expensesTotal(@Param("tenantId") Long tenantId,
+                             @Param("from") LocalDate from,
                              @Param("to") LocalDate to);
 
     // Used for the Type breakdown chart
@@ -59,7 +74,9 @@ public interface CostRepo extends JpaRepository<Costs, Long> {
     List<Costs> findByFrequencyNot(PaymentFrequency frequency);
 
     @Query(value = "SELECT c.tipo AS costType, COALESCE(SUM(c.valor), 0) AS total " +
-                   "FROM costos c WHERE c.fecha BETWEEN :from AND :to GROUP BY c.tipo",
+                   "FROM costos c WHERE c.tenant_id = :tenantId AND c.fecha BETWEEN :from AND :to GROUP BY c.tipo",
            nativeQuery = true)
-    List<Object[]> summaryByType(@Param("from") LocalDate from, @Param("to") LocalDate to);
+    List<Object[]> summaryByType(@Param("tenantId") Long tenantId,
+                                  @Param("from") LocalDate from,
+                                  @Param("to") LocalDate to);
 }

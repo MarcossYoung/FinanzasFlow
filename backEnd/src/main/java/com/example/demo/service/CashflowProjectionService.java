@@ -1,5 +1,6 @@
 package com.example.demo.service;
 
+import com.example.demo.config.TenantContext;
 import com.example.demo.dto.DailyCashflowPoint;
 import com.example.demo.model.Costs;
 import com.example.demo.model.PaymentFrequency;
@@ -29,9 +30,10 @@ public class CashflowProjectionService {
 
     @Transactional(readOnly = true)
     public List<DailyCashflowPoint> project(LocalDate from, LocalDate to) {
-        List<PaymentSchedule> schedules = scheduleRepo.findByStatusAndExpectedDateBetween(
-                ScheduleStatus.PENDIENTE, from, to);
-        List<Costs> costs = costRepo.findByDateBetween(from, to);
+        Long tenantId = currentTenantId();
+        List<PaymentSchedule> schedules = scheduleRepo.findByTenant_IdAndStatusAndExpectedDateBetween(
+                tenantId, ScheduleStatus.PENDIENTE, from, to);
+        List<Costs> costs = costRepo.findByDateBetweenAndTenant_Id(from, to, tenantId);
         List<DailyCashflowPoint> points = new ArrayList<>();
         BigDecimal cumulative = BigDecimal.ZERO;
 
@@ -71,5 +73,13 @@ public class CashflowProjectionService {
                 .map(Costs::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return monthly.divide(BigDecimal.valueOf(30), 2, RoundingMode.HALF_UP);
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContext.get();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant not available");
+        }
+        return tenantId;
     }
 }

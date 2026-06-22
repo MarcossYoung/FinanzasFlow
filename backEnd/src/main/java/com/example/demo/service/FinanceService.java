@@ -1,5 +1,6 @@
 package com.example.demo.service;
 
+import com.example.demo.config.TenantContext;
 import com.example.demo.dto.FinanceDashboardResponse;
 import com.example.demo.model.Costs;
 import com.example.demo.model.Invoice;
@@ -30,9 +31,10 @@ public class FinanceService {
 
     @Transactional(readOnly = true)
     public FinanceDashboardResponse dashboard(LocalDate from, LocalDate to) {
-        List<Invoice> invoices = InvoiceRepository.findByStartDateBetween(from, to);
-        List<OrderPayments> payments = paymentRepository.findByPaymentDateBetween(from, to);
-        List<Costs> allCosts = costsRepository.findByDateBetween(from, to);
+        Long tenantId = currentTenantId();
+        List<Invoice> invoices = InvoiceRepository.findByStartDateBetweenAndTenant_Id(from, to, tenantId);
+        List<OrderPayments> payments = paymentRepository.findByPaymentDateBetweenAndTenant_Id(from, to, tenantId);
+        List<Costs> allCosts = costsRepository.findByDateBetweenAndTenant_Id(from, to, tenantId);
 
         Map<String, BigDecimal> breakdownMap = allCosts.stream()
                 .filter(c -> c.getCostType() != null)
@@ -85,7 +87,15 @@ public class FinanceService {
     }
 
     public List<Map<String, Object>> getMonthlyUserStats(LocalDate from, LocalDate to) {
-        return getMonthlyUserStats(InvoiceRepository.findByStartDateBetween(from, to));
+        return getMonthlyUserStats(InvoiceRepository.findByStartDateBetweenAndTenant_Id(from, to, currentTenantId()));
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContext.get();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant not available");
+        }
+        return tenantId;
     }
 
     private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }

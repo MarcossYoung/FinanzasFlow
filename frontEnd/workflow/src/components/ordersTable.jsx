@@ -1,11 +1,7 @@
-import React, {useState, useEffect, useContext, useCallback} from 'react';
+import React, {useCallback, useContext, useEffect, useState} from 'react';
 import axios from 'axios';
-import {
-	FaTrashAlt,
-	FaChevronLeft,
-	FaChevronRight,
-	FaPlus,
-} from 'react-icons/fa';
+import {FaChevronLeft, FaChevronRight, FaPlus, FaTrashAlt} from 'react-icons/fa';
+import {useNavigate} from 'react-router-dom';
 import {UserContext} from '../UserProvider';
 import {BASE_URL} from '../api/config';
 import InvoiceCreationModal from './invoiceCreationModal';
@@ -18,20 +14,22 @@ const formatMoney = (value) =>
 	});
 
 const STATUS_LABELS = {
-	CERRADO:       'Cobrada',
-	EN_GESTION:    'En gestión',
+	CERRADO: 'Cobrada',
+	EN_GESTION: 'En gestión',
 	PROMETIO_PAGO: 'Prometió pago',
-	EN_DISPUTA:    'En disputa',
-	INCOBRABLE:    'Incobrable',
-	CONTACTADO:    'Contactado',
+	EN_DISPUTA: 'En disputa',
+	INCOBRABLE: 'Incobrable',
+	CONTACTADO: 'Contactado',
 };
 
-export default function InvoicesTable({endpoint}) {
+export default function InvoicesTable({endpoint, allowManualCreate = false}) {
 	const {user} = useContext(UserContext);
-	const canEdit = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'GESTOR';
-
+	const navigate = useNavigate();
+	const canEdit = user?.role === 'ADMIN' || user?.role === 'GESTOR';
+	const canDelete = user?.role === 'ADMIN';
+	const canCreateManually = allowManualCreate && canEdit;
 	const [invoices, setInvoices] = useState([]);
-	const [loading, setLoading] = useState(false);
+	const [loading, setLoading] = useState(true);
 	const [currentPage, setCurrentPage] = useState(0);
 	const [totalPages, setTotalPages] = useState(0);
 	const [searchTerm, setSearchTerm] = useState('');
@@ -39,7 +37,6 @@ export default function InvoicesTable({endpoint}) {
 
 	const fetchInvoices = useCallback(async () => {
 		if (!endpoint) return;
-
 		setLoading(true);
 		try {
 			const token = localStorage.getItem('token');
@@ -47,14 +44,8 @@ export default function InvoicesTable({endpoint}) {
 				headers: {Authorization: `Bearer ${token}`},
 				params: {page: currentPage, size: 10},
 			});
-
-			if (res.data.content) {
-				setInvoices(res.data.content);
-				setTotalPages(res.data.totalPages);
-			} else {
-				setInvoices(res.data);
-				setTotalPages(1);
-			}
+			setInvoices(res.data.content ?? res.data);
+			setTotalPages(res.data.totalPages ?? 1);
 		} catch (err) {
 			console.error('Error fetching invoices:', err);
 		} finally {
@@ -72,20 +63,16 @@ export default function InvoicesTable({endpoint}) {
 	};
 
 	const handleDelete = async (id) => {
-		if (!window.confirm('Eliminar esta factura?')) return;
+		if (!window.confirm('¿Eliminar esta factura?')) return;
 		try {
 			const token = localStorage.getItem('token');
 			await axios.delete(`${BASE_URL}/api/invoices/${id}`, {
 				headers: {Authorization: `Bearer ${token}`},
 			});
 			fetchInvoices();
-		} catch (err) {
+		} catch {
 			alert('Error al eliminar');
 		}
-	};
-
-	const handleDetail = (id) => {
-		window.location.href = `/invoices/${id}`;
 	};
 
 	const getRowClass = (status) => {
@@ -98,156 +85,61 @@ export default function InvoicesTable({endpoint}) {
 	const displayedInvoices = invoices.filter((invoice) => {
 		if (!searchTerm) return true;
 		const search = searchTerm.toLowerCase();
-		return (
-			invoice.titulo?.toLowerCase().includes(search) ||
-			invoice.customerName?.toLowerCase().includes(search)
-		);
+		return invoice.titulo?.toLowerCase().includes(search) ||
+			invoice.customerName?.toLowerCase().includes(search);
 	});
-	const isOnboardingEmpty = !loading && invoices.length === 0 && !searchTerm;
-
-	if (isOnboardingEmpty) {
-		return (
-			<div className='orders-view-container'>
-				<div className='invoice-empty-onboarding'>
-					{canEdit && (
-						<div className='invoice-empty-actions'>
-							<button
-								className='btn-pill invoice-empty-primary'
-								onClick={() => setIsModalOpen(true)}
-							>
-								<FaPlus size={12} />
-								Agregar primera factura
-							</button>
-						</div>
-					)}
-				</div>
-				<InvoiceCreationModal isOpen={isModalOpen} onClose={handleModalClose} />
-			</div>
-		);
-	}
 
 	return (
 		<div className='orders-view-container'>
-			{!isOnboardingEmpty && (
 			<div className='admin-tools'>
 				<input
 					type='text'
-					placeholder='Buscar por titulo o cliente...'
+					placeholder='Buscar por título o cliente...'
 					value={searchTerm}
 					onChange={(e) => setSearchTerm(e.target.value)}
 				/>
-
-				{canEdit && (
-					<button
-						className='btn-pill'
-						onClick={() => setIsModalOpen(true)}
-						style={{
-							backgroundColor: '#00b894',
-							color: 'white',
-							border: 'none',
-						}}
-					>
-						<FaPlus size={12} />
-						Nueva Factura
+				{canCreateManually && (
+					<button className='btn-pill manual-entry-action' onClick={() => setIsModalOpen(true)}>
+						<FaPlus size={12} /> Agregar o corregir manualmente
 					</button>
 				)}
 			</div>
-			)}
 
 			<div className='table-wrapper full-height'>
 				{loading ? (
-					<div className='text-center' style={{padding: '2rem'}}>
-						Cargando...
-					</div>
+					<div className='orders-loading-state'>Cargando...</div>
 				) : (
 					<table className='orders-table'>
-						<thead>
-							<tr>
-								<th>Id</th>
-								<th>Titulo</th>
-								<th>Cliente</th>
-								<th>Cant.</th>
-								<th>Emisión</th>
-								<th>Vencimiento</th>
-								<th>Estado</th>
-								<th>Saldo</th>
-								{(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') && <th>Acciones</th>}
-							</tr>
-						</thead>
+						<thead><tr>
+							<th>Id</th><th>Título</th><th>Cliente</th><th>Cant.</th>
+							<th>Emisión</th><th>Vencimiento</th><th>Estado</th><th>Saldo</th>
+							{canDelete && <th>Acciones</th>}
+						</tr></thead>
 						<tbody>
-							{displayedInvoices.length > 0 ? (
-								displayedInvoices.map((invoice) => (
-									<tr
-										key={invoice.id}
-										className={getRowClass(invoice.workOrderStatus)}
-										onClick={() => handleDetail(invoice.id)}
-									>
-										<td>{invoice.id}</td>
-										<td className='truncate'>
-											<strong>{invoice.titulo}</strong>
-										</td>
-										<td>{invoice.customerName || '-'}</td>
-										<td>{invoice.cantidad || '-'}</td>
-										<td>{invoice.startDate || '-'}</td>
-										<td>{invoice.fechaEntrega || invoice.fechaEstimada || '-'}</td>
-										<td>
-									<span
-										className={`status-badge status-${(invoice.workOrderStatus || 'EN_GESTION').toLowerCase().replace(/_/g, '-')}`}
-									>
+							{displayedInvoices.length > 0 ? displayedInvoices.map((invoice) => (
+								<tr key={invoice.id} className={getRowClass(invoice.workOrderStatus)} onClick={() => navigate(`/invoices/${invoice.id}`)}>
+									<td>{invoice.id}</td>
+									<td className='truncate'><strong>{invoice.titulo}</strong></td>
+									<td>{invoice.customerName || '-'}</td>
+									<td>{invoice.cantidad || '-'}</td>
+									<td>{invoice.startDate || '-'}</td>
+									<td>{invoice.fechaEntrega || invoice.fechaEstimada || '-'}</td>
+									<td><span className={`status-badge status-${(invoice.workOrderStatus || 'EN_GESTION').toLowerCase().replace(/_/g, '-')}`}>
 										{STATUS_LABELS[invoice.workOrderStatus] ?? invoice.workOrderStatus ?? 'En gestión'}
-									</span>
-								</td>
-										<td>
-											{formatMoney(
-												Number(invoice.precio || 0) -
-													Number(invoice.totalPaid || 0),
-											)}
-										</td>
-										{(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') && (
-											<td onClick={(e) => e.stopPropagation()}>
-												<button
-													className='button-red-icon'
-													style={{
-														background: 'transparent',
-														border: 'none',
-														color: '#EF4444',
-														cursor: 'pointer',
-														fontSize: '1.2rem',
-													}}
-													onClick={() => handleDelete(invoice.id)}
-												>
-													<FaTrashAlt />
-												</button>
-											</td>
-										)}
-									</tr>
-								))
-							) : (
-								<tr>
-									<td colSpan='9'>
-										{searchTerm ? (
-											<div style={{padding: '2rem', textAlign: 'center', color: '#888'}}>
-												No se encontraron resultados para esa búsqueda.
-											</div>
-										) : (
-											<div style={{padding: '3rem', textAlign: 'center'}}>
-												<p style={{color: '#888', marginBottom: '1rem', fontSize: '0.95rem'}}>
-													Todavía no hay facturas.
-												</p>
-												{canEdit && (
-													<button
-														className='btn-pill'
-														onClick={() => setIsModalOpen(true)}
-														style={{backgroundColor: '#00b894', color: 'white', border: 'none'}}
-													>
-														<FaPlus size={12} />
-														Nueva Factura
-													</button>
-												)}
-											</div>
-										)}
-									</td>
+									</span></td>
+									<td>{formatMoney(Number(invoice.precio || 0) - Number(invoice.totalPaid || 0))}</td>
+									{canDelete && <td onClick={(e) => e.stopPropagation()}>
+										<button className='button-red-icon orders-delete-action' onClick={() => handleDelete(invoice.id)} aria-label={`Eliminar factura ${invoice.id}`}>
+											<FaTrashAlt />
+										</button>
+									</td>}
 								</tr>
+							)) : (
+								<tr><td colSpan={canDelete ? 9 : 8} className='orders-empty-cell'>
+									{searchTerm
+										? 'No se encontraron resultados para esa búsqueda.'
+										: 'Todavía no hay facturas. Las facturas ingresadas por Telegram aparecerán aquí.'}
+								</td></tr>
 							)}
 						</tbody>
 					</table>
@@ -255,28 +147,16 @@ export default function InvoicesTable({endpoint}) {
 			</div>
 
 			<div className='pagination-container'>
-				<button
-					disabled={currentPage === 0}
-					onClick={() => setCurrentPage((prev) => prev - 1)}
-					className='btn-pagination'
-				>
+				<button disabled={currentPage === 0} onClick={() => setCurrentPage((page) => page - 1)} className='btn-pagination'>
 					<FaChevronLeft /> Anterior
 				</button>
-
-				<span>
-					Página <strong>{currentPage + 1}</strong> de {totalPages || 1}
-				</span>
-
-				<button
-					disabled={currentPage >= totalPages - 1}
-					onClick={() => setCurrentPage((prev) => prev + 1)}
-					className='btn-pagination'
-				>
+				<span>Página <strong>{currentPage + 1}</strong> de {totalPages || 1}</span>
+				<button disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage((page) => page + 1)} className='btn-pagination'>
 					Siguiente <FaChevronRight />
 				</button>
 			</div>
 
-			<InvoiceCreationModal isOpen={isModalOpen} onClose={handleModalClose} />
+			{canCreateManually && <InvoiceCreationModal isOpen={isModalOpen} onClose={handleModalClose} />}
 		</div>
 	);
 }

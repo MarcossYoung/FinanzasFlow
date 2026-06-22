@@ -18,6 +18,9 @@ public class JwtTokenUtil {
     @Value("${jwt.secret}")
     private String secretKey;
 
+    @Value("${jwt.expiration-minutes:120}")
+    private long expirationMinutes;
+
     private Key getSigningKey() {
         byte[] keyBytes = decodeSecret(secretKey);
         if (keyBytes.length < 32) {
@@ -44,7 +47,7 @@ public class JwtTokenUtil {
                 .setSubject(username)
                 .claim("tenantId", tenantId)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10)) // 10 hours
+                .setExpiration(new Date(System.currentTimeMillis() + expirationMinutes * 60 * 1000))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256) // Use Key object and specify algorithm
                 .compact();
     }

@@ -2,6 +2,7 @@ package com.example.demo.service;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
+import com.example.demo.config.TenantContext;
 import com.example.demo.dto.CreatePaymentRequest;
 import com.example.demo.dto.ProductPayments;
 import com.example.demo.model.OrderPayments;
@@ -37,7 +38,10 @@ public class PaymentService {
     }
 
     public List<ProductPayments> getPayments(Long id) {
-        return orderPaymentsRepo.findByInvoice_Id(id)
+        Long tenantId = currentTenantId();
+        InvoiceRepo.findByIdAndTenant_Id(id, tenantId)
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+        return orderPaymentsRepo.findByInvoice_IdAndTenant_Id(id, tenantId)
                 .stream()
                 .map(ProductPayments::from)
                 .toList();
@@ -46,7 +50,8 @@ public class PaymentService {
     public OrderPayments createPayment(CreatePaymentRequest req) {
         log.info("createPayment called with product_id={}, type={}, valor={}, method={}, fecha={}",
                 req.product_id(), req.type(), req.valor(), req.paymentMethod(), req.fecha());
-        Invoice Invoice = InvoiceRepo.findById(req.product_id())
+        Long tenantId = currentTenantId();
+        Invoice Invoice = InvoiceRepo.findByIdAndTenant_Id(req.product_id(), tenantId)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
 
         OrderPayments payment = new OrderPayments();
@@ -55,6 +60,7 @@ public class PaymentService {
         payment.setPaymentDate(LocalDate.parse(req.fecha().replace('/', '-')));
         payment.setPaymentMethod(req.paymentMethod());
         payment.setInvoice(Invoice);
+        payment.setTenant(Invoice.getTenant());
 
         return orderPaymentsRepo.save(payment);
     }
@@ -69,10 +75,13 @@ public class PaymentService {
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             throw new IllegalArgumentException("File type not allowed. Accepted: jpg, jpeg, png, pdf");
         }
+        if (!isAllowedContentType(file.getContentType())) {
+            throw new IllegalArgumentException("File content type not allowed. Accepted: jpg, jpeg, png, pdf");
+        }
 
         if (cloudinary == null) throw new IllegalStateException("Cloudinary not configured (check env vars)");
 
-        OrderPayments payment = orderPaymentsRepo.findById(paymentId)
+        OrderPayments payment = orderPaymentsRepo.findByIdAndTenant_Id(paymentId, currentTenantId())
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
 
         Map uploadResult = cloudinary.uploader().upload(
@@ -86,11 +95,23 @@ public class PaymentService {
     }
 
     public String getReceiptUrl(Long paymentId) {
-        OrderPayments payment = orderPaymentsRepo.findById(paymentId)
+        OrderPayments payment = orderPaymentsRepo.findByIdAndTenant_Id(paymentId, currentTenantId())
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
         if (payment.getReceiptPath() == null) {
             throw new RuntimeException("No receipt found for this payment");
         }
         return payment.getReceiptPath();
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContext.get();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant not available");
+        }
+        return tenantId;
+    }
+
+    private boolean isAllowedContentType(String contentType) {
+        return contentType != null && Set.of("image/jpeg", "image/png", "application/pdf").contains(contentType);
     }
 }

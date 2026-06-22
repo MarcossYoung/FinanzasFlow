@@ -49,8 +49,16 @@ public class WorkOrderService {
         return workOrderRepository.findByStatus(type).size();
     }
 
+    public long countByTypeForTenant(Status type, Long tenantId) {
+        return workOrderRepository.findByTenantIdAndStatus(tenantId, type).size();
+    }
+
     public long countDueBetween(LocalDate today, LocalDate endOfWeek) {
         return workOrderRepository.countFechaEntrega(today, endOfWeek);
+    }
+
+    public long countDueBetweenForTenant(Long tenantId, LocalDate today, LocalDate endOfWeek) {
+        return workOrderRepository.countFechaEntregaByTenant(tenantId, today, endOfWeek);
     }
 
     public List<WorkOrder> getLateProducts() {
@@ -60,5 +68,10 @@ public class WorkOrderService {
     public Map<String, Long> countOrdersByStatus() {
         return workOrderRepository.findAll().stream()
                 .collect(Collectors.groupingBy(w -> w.getStatus().name(), Collectors.counting()));
+    }
+
+    public Map<String, Long> countOrdersByStatusForTenant(Long tenantId) {
+        return workOrderRepository.countOrdersByStatusForTenant(tenantId).stream()
+                .collect(Collectors.toMap(row -> ((Status) row[0]).name(), row -> (Long) row[1]));
     }
 }

@@ -22,7 +22,9 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.spec.SecretKeySpec;
 import java.security.Key;
+import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 @Service
@@ -31,6 +33,14 @@ public class AppUserService {
 
     Authentication auth;
     private static final long EXPIRATION_TIME = 86400000;
+    private final Map<String, LoginAttempt> loginAttempts = new ConcurrentHashMap<>();
+
+    @Value("${auth.login.max-failures:5}")
+    private int maxLoginFailures;
+
+    @Value("${auth.login.lock-minutes:15}")
+    private long loginLockMinutes;
+
     @Value("${jwt.secret}")
     private String secretKey;
     @Autowired
@@ -54,19 +64,20 @@ public class AppUserService {
 
     public Map<String, Object> loginUser(String username, String password) {
         try {
-            AppUser foundUser = appUserRepository.findByUsername(username)
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+            assertLoginAllowed(username);
+            Optional<AppUser> userLookup = appUserRepository.findByUsername(username);
+            if (userLookup.isEmpty()) {
+                recordFailedLogin(username);
+                throw new UsernameNotFoundException("User not found: " + username);
+            }
+            AppUser foundUser = userLookup.get();
 
             if (password == null || !passwordEncoder.matches(password, foundUser.getPassword())) {
-                log.warn(
-                        "Login password mismatch for username='{}', passwordProvided={}, passwordLength={}, storedHashPrefix='{}'",
-                        username,
-                        password != null,
-                        password != null ? password.length() : 0,
-                        passwordPrefix(foundUser.getPassword())
-                );
+                recordFailedLogin(username);
+                log.warn("Login password mismatch for username='{}'", username);
                 throw new BadCredentialsException("Invalid username or password");
             }
+            clearFailedLogin(username);
 
             // Set security context
             Authentication authentication = new UsernamePasswordAuthenticationToken(
@@ -97,16 +108,6 @@ public class AppUserService {
         }
     }
 
-    private String passwordPrefix(String encodedPassword) {
-        if (encodedPassword == null || encodedPassword.length() < 4) {
-            return "<none>";
-        }
-        return encodedPassword.substring(0, 4);
-    }
-
-
-
-
     public AppUser registerUser(AppUser registration) {
         if (appUserRepository.existsByUsername(registration.getUsername())) {
             throw new UserAlreadyExistsException("Usuario ya existe");
@@ -115,8 +116,8 @@ public class AppUserService {
         AppUser user = new AppUser();
         user.setUsername(registration.getUsername());
         user.setPassword(passwordEncoder.encode(registration.getPassword()));
-        user.setAppUserRole(registration.getAppUserRole() != null ? registration.getAppUserRole() : AppUserRole.GESTOR);
         AppUser creator = getCurrentUser();
+        user.setAppUserRole(resolveCreatableRole(creator, registration.getAppUserRole()));
         if (creator != null && creator.getTenant() != null) {
             user.setTenant(creator.getTenant());
         }
@@ -124,8 +125,26 @@ public class AppUserService {
         return appUserRepository.save(user);
     }
 
+    private AppUserRole resolveCreatableRole(AppUser creator, AppUserRole requestedRole) {
+        AppUserRole role = requestedRole != null ? requestedRole : AppUserRole.GESTOR;
+        if (role == AppUserRole.SUPER_ADMIN
+                && (creator == null || creator.getAppUserRole() != AppUserRole.SUPER_ADMIN)) {
+            throw new IllegalArgumentException("Only SUPER_ADMIN can create SUPER_ADMIN users");
+        }
+        return role;
+    }
+
     public AppUser getUserById(Long id) {
         return appUserRepository.findById(id).orElse(null);
+    }
+
+    public AppUser getVisibleUserById(Long id) {
+        AppUser currentUser = getCurrentUser();
+        AppUser target = appUserRepository.findById(id).orElse(null);
+        if (target == null || currentUser == null) return null;
+        if (currentUser.getAppUserRole() == AppUserRole.SUPER_ADMIN) return target;
+        if (currentUser.getTenant() == null || target.getTenant() == null) return null;
+        return currentUser.getTenant().getId().equals(target.getTenant().getId()) ? target : null;
     }
 
     public Optional<AppUser> findByUsername(String username){ return  appUserRepository.findByUsername(username); }
@@ -158,6 +177,11 @@ public class AppUserService {
     }
 
     public List<UserSummaryDto> getAllUsers() {
+        AppUser currentUser = getCurrentUser();
+        if (currentUser != null && currentUser.getAppUserRole() != AppUserRole.SUPER_ADMIN
+                && currentUser.getTenant() != null) {
+            return getUsersForTenant(currentUser.getTenant().getId());
+        }
         return appUserRepository.findAll().stream()
                 .map(u -> new UserSummaryDto(u.getId(), u.getUsername(), u.getAppUserRole().name()))
                 .collect(java.util.stream.Collectors.toList());
@@ -169,4 +193,37 @@ public class AppUserService {
                 .map(u -> new UserSummaryDto(u.getId(), u.getUsername(), u.getAppUserRole().name()))
                 .collect(java.util.stream.Collectors.toList());
     }
+
+    private void assertLoginAllowed(String username) {
+        LoginAttempt attempt = loginAttempts.get(loginKey(username));
+        if (attempt == null || attempt.lockedUntil() == null) return;
+        if (Instant.now().isBefore(attempt.lockedUntil())) {
+            throw new BadCredentialsException("Too many login attempts");
+        }
+        loginAttempts.remove(loginKey(username));
+    }
+
+    private void recordFailedLogin(String username) {
+        String key = loginKey(username);
+        LoginAttempt updated = loginAttempts.compute(key, (ignored, existing) -> {
+            int failures = existing == null ? 1 : existing.failures() + 1;
+            Instant lockedUntil = failures >= maxLoginFailures
+                    ? Instant.now().plusSeconds(loginLockMinutes * 60)
+                    : null;
+            return new LoginAttempt(failures, lockedUntil);
+        });
+        if (updated != null && updated.lockedUntil() != null) {
+            log.warn("Temporarily locked login for username='{}' after repeated failures", username);
+        }
+    }
+
+    private void clearFailedLogin(String username) {
+        loginAttempts.remove(loginKey(username));
+    }
+
+    private String loginKey(String username) {
+        return username == null ? "" : username.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private record LoginAttempt(int failures, Instant lockedUntil) {}
 }

@@ -2,6 +2,8 @@ package com.example.demo.service;
 
 import com.example.demo.dto.FinanceDashboardResponse;
 import com.example.demo.dto.InvoiceResponse;
+import com.example.demo.dto.LedgerExtraction;
+import com.example.demo.exceptions.AiServiceException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,15 +19,15 @@ import java.time.temporal.WeekFields;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.Base64;
 
 @Service
 public class AiService {
 
     private final FinanceService financeService;
     private final InvoiceService invoiceService;
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     @Value("${anthropic.api.key:}")
     private String apiKey;
@@ -35,24 +37,28 @@ public class AiService {
 
     private static final String ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
     private static final String MODEL = "claude-haiku-4-5-20251001";
+    private static final String LEDGER_EXTRACTION_SYSTEM = """
+            Eres un extractor de documentos contables para FinanzasFlow.
+            Extrae datos sin decidir si el documento es un cobro o un gasto.
+            Responde SOLO con JSON valido, sin markdown ni explicaciones, con estas claves exactas:
+            titulo (string o null), counterpartyName (string o null), cuitDni (string o null),
+            email (string o null), phone (string o null), amount (numero o null, total del documento),
+            issueDate (YYYY-MM-DD o null), dueDate (YYYY-MM-DD o null), description (string o null),
+            lineItems (array de objetos con description, quantity, unitPrice; [] si no hay detalle).
+            No inventes importes, fechas, identidad ni contacto. Usa punto decimal y fechas ISO.
+            """;
 
-    public AiService(FinanceService financeService, InvoiceService invoiceService) {
+    public AiService(FinanceService financeService, InvoiceService invoiceService, RestTemplate restTemplate) {
         this.financeService = financeService;
         this.invoiceService = invoiceService;
+        this.restTemplate = restTemplate;
     }
 
-    private String callClaude(String systemPrompt, String userMessage, int maxTokens) {
+    private String postToAnthropic(Map<String, Object> body) {
         if (apiKey == null || apiKey.isBlank()) {
-            return "IA no configurada: falta ANTHROPIC_API_KEY.";
+            throw new AiServiceException(AiServiceException.Reason.NOT_CONFIGURED, "Anthropic is not configured");
         }
-
         try {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("model", MODEL);
-            body.put("max_tokens", maxTokens);
-            body.put("system", systemPrompt);
-            body.put("messages", List.of(Map.of("role", "user", "content", userMessage)));
-
             String bodyJson = objectMapper.writeValueAsString(body);
             String[] responseHolder = {null};
 
@@ -71,33 +77,116 @@ public class AiService {
                     }
             );
 
-            if (responseHolder[0] == null) return "";
+            if (responseHolder[0] == null || responseHolder[0].isBlank()) {
+                throw new AiServiceException(AiServiceException.Reason.EMPTY_RESPONSE, "Anthropic returned an empty response");
+            }
             Map<String, Object> parsed = objectMapper.readValue(responseHolder[0], new TypeReference<>() {});
             List<?> content = (List<?>) parsed.get("content");
             if (content != null && !content.isEmpty()) {
-                Map<?, ?> first = (Map<?, ?>) content.get(0);
-                return (String) first.get("text");
+                for (Object block : content) {
+                    if (block instanceof Map<?, ?> item && "text".equals(item.get("type")) && item.get("text") instanceof String text) {
+                        return text;
+                    }
+                }
             }
-            return "";
+            throw new AiServiceException(AiServiceException.Reason.EMPTY_RESPONSE, "Anthropic returned no text block");
+        } catch (AiServiceException e) {
+            throw e;
         } catch (Exception e) {
-            return "Error al contactar IA: " + e.getMessage();
+            throw new AiServiceException(AiServiceException.Reason.HTTP_ERROR, "Anthropic request failed", e);
         }
+    }
+
+    private Map<String, Object> textBody(String systemPrompt, Object content, int maxTokens) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", MODEL);
+        body.put("max_tokens", maxTokens);
+        body.put("system", systemPrompt);
+        body.put("messages", List.of(Map.of("role", "user", "content", content)));
+        return body;
+    }
+
+    private String callClaude(String systemPrompt, String userMessage, int maxTokens) {
+        try {
+            return postToAnthropic(textBody(systemPrompt, userMessage, maxTokens));
+        } catch (AiServiceException e) {
+            return e.getReason() == AiServiceException.Reason.NOT_CONFIGURED
+                    ? "IA no configurada: falta ANTHROPIC_API_KEY."
+                    : "Error al contactar IA.";
+        }
+    }
+
+    public String callClaudeVision(String systemPrompt, byte[] fileBytes, String mediaType,
+                                   String userText, int maxTokens) {
+        String blockType = "application/pdf".equals(mediaType) ? "document" : "image";
+        Map<String, Object> source = Map.of(
+                "type", "base64",
+                "media_type", mediaType,
+                "data", Base64.getEncoder().encodeToString(fileBytes)
+        );
+        List<Map<String, Object>> content = List.of(
+                Map.of("type", blockType, "source", source),
+                Map.of("type", "text", "text", userText == null || userText.isBlank()
+                        ? "Extrae los datos contables de este documento." : userText)
+        );
+        return postToAnthropic(textBody(systemPrompt, content, maxTokens));
     }
 
     private Map<String, Object> callClaudeForJson(String systemPrompt, String userMessage, int maxTokens) {
         try {
-            String raw = callClaude(systemPrompt, userMessage, maxTokens);
-            if (raw == null || raw.isBlank() || raw.startsWith("IA no configurada") || raw.startsWith("Error al contactar IA")) {
-                return Map.of();
-            }
-            String cleaned = raw.trim();
-            if (cleaned.startsWith("```")) {
-                cleaned = cleaned.replaceAll("^```[a-zA-Z]*\\n?", "").replaceAll("```$", "").trim();
-            }
+            String raw = postToAnthropic(textBody(systemPrompt, userMessage, maxTokens));
+            String cleaned = cleanJson(raw);
             return objectMapper.readValue(cleaned, new TypeReference<>() {});
         } catch (Exception e) {
             return Map.of();
         }
+    }
+
+    private String cleanJson(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new AiServiceException(AiServiceException.Reason.EMPTY_RESPONSE, "Claude returned empty extraction");
+        }
+        String cleaned = raw.trim();
+        if (cleaned.startsWith("```")) {
+            cleaned = cleaned.replaceAll("^```[a-zA-Z]*\\n?", "").replaceAll("```$", "").trim();
+        }
+        return cleaned;
+    }
+
+    private LedgerExtraction parseLedgerJson(String raw) {
+        try {
+            return objectMapper.readValue(cleanJson(raw), LedgerExtraction.class);
+        } catch (AiServiceException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude returned invalid extraction JSON", e);
+        }
+    }
+
+    public LedgerExtraction parseLedgerText(String text) {
+        if (text == null || text.isBlank()) {
+            throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Ledger text is empty");
+        }
+        return parseLedgerJson(postToAnthropic(textBody(
+                LEDGER_EXTRACTION_SYSTEM,
+                "Extrae los datos contables de este texto:\n" + text,
+                500
+        )));
+    }
+
+    public LedgerExtraction parseLedgerMediaFromBytes(byte[] bytes, String mediaType, String caption) {
+        if (bytes == null || bytes.length == 0) {
+            throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Ledger media is empty");
+        }
+        return parseLedgerJson(callClaudeVision(
+                LEDGER_EXTRACTION_SYSTEM,
+                bytes,
+                mediaType,
+                caption == null || caption.isBlank()
+                        ? "Extrae los datos contables de este documento."
+                        : "Contexto del usuario: " + caption,
+                500
+        ));
     }
 
     public String generateFinanceInsight(String from, String to) {
@@ -120,35 +209,28 @@ public class AiService {
 
     // Kept method name for existing /api/ai/parse-order endpoint compatibility.
     public Map<String, Object> parseOrderDescription(String description) {
-        String system = """
-                Eres un asistente de FinanzasFlow para cargar facturas B2B y casos de cobranza.
-                Extrae datos de emails, mensajes, PDFs transcritos o notas internas.
-                Responde SOLO con JSON valido, sin markdown ni explicaciones, con estas claves exactas:
-                titulo (string o null),
-                customerName (string o null),
-                cuitDni (string o null),
-                customerEmail (string o null),
-                clientPhone (string o null),
-                precio (numero o null, importe total de la factura),
-                amount (numero o null, pago inicial/parcial si se menciona),
-                startDate (YYYY-MM-DD o null, fecha de emision),
-                fechaEntrega (YYYY-MM-DD o null, fecha de vencimiento),
-                fechaEstimada (YYYY-MM-DD o null, usar la misma fecha de vencimiento si aplica),
-                notas (string o null),
-                lineItems (array de objetos con description, quantity, unitPrice; [] si no hay detalle).
-                Si no hay titulo explicito, crea uno breve como "Factura - {customerName}".
-                No inventes importes, fechas, CUIT ni contacto.
-                """;
+        try {
+            LedgerExtraction extraction = parseLedgerText(description);
+            Map<String, Object> result = new LinkedHashMap<>();
+            putIfNotNull(result, "titulo", extraction.titulo());
+            putIfNotNull(result, "customerName", extraction.counterpartyName());
+            putIfNotNull(result, "cuitDni", extraction.cuitDni());
+            putIfNotNull(result, "customerEmail", extraction.email());
+            putIfNotNull(result, "clientPhone", extraction.phone());
+            putIfNotNull(result, "precio", extraction.amount());
+            putIfNotNull(result, "startDate", extraction.issueDate());
+            putIfNotNull(result, "fechaEntrega", extraction.dueDate());
+            putIfNotNull(result, "fechaEstimada", extraction.dueDate());
+            putIfNotNull(result, "notas", extraction.description());
+            result.put("lineItems", extraction.lineItems());
+            return result;
+        } catch (AiServiceException e) {
+            return Map.of();
+        }
+    }
 
-        Map<String, Object> result = callClaudeForJson(
-                system,
-                "Descripcion de factura/cobranza: " + description,
-                500
-        );
-
-        return result.entrySet().stream()
-                .filter(e -> e.getValue() != null)
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    private void putIfNotNull(Map<String, Object> target, String key, Object value) {
+        if (value != null) target.put(key, value);
     }
 
     public Map<String, Object> generateWeeklyDigest() {

@@ -9,7 +9,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/payment-options")
-@CrossOrigin(origins = "*")
 public class PaymentOptionController {
 
     private final PaymentOptionRepo paymentOptionRepo;

@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 
 @PreAuthorize("hasAuthority('SUPER_ADMIN')")
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/operator")
 public class OperatorController {

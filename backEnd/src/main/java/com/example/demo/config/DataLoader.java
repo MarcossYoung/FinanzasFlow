@@ -34,6 +34,9 @@ public class DataLoader implements CommandLineRunner {
     @Value("${app.reset-seed-passwords:false}")
     private boolean resetSeedPasswords;
 
+    @Value("${app.superadmin.initial-password:}")
+    private String superadminInitialPassword;
+
     public DataLoader(InvoiceRepo InvoiceRepo, UserRepo userRepo, WorkOrderRepo workOrderRepo,
                       PaymentRepo paymentRepo, CostRepo costRepo,
                       TenantRepo tenantRepo,
@@ -54,7 +57,7 @@ public class DataLoader implements CommandLineRunner {
         userRepo.deleteViewerUsers();
 
         Tenant defaultTenant = ensureTenant("Demo Distribuidora", "distribuidora-demo");
-        ensureUser("superadmin", "superadmin123", AppUserRole.SUPER_ADMIN, "1140000000", defaultTenant);
+        ensureSuperAdmin(defaultTenant);
         AppUser admin  = ensureUser("admin",  "admin123",  AppUserRole.ADMIN,  "1140000001", defaultTenant);
         AppUser carlos = ensureUser("carlos", "gestor123", AppUserRole.GESTOR, "1140000002", defaultTenant);
         AppUser laura  = ensureUser("laura",  "gestor123", AppUserRole.GESTOR, "1140000003", defaultTenant);
@@ -63,7 +66,7 @@ public class DataLoader implements CommandLineRunner {
         if (InvoiceRepo.count() > 0) return;
 
         seedOrders(admin, carlos, laura);
-        seedCosts();
+        seedCosts(admin.getTenant());
     }
 
     // ─── Users ───────────────────────────────────────────────────────────────
@@ -75,6 +78,28 @@ public class DataLoader implements CommandLineRunner {
             tenant.setSlug(slug);
             tenant.setCreatedAt(LocalDateTime.now());
             return tenantRepo.save(tenant);
+        });
+    }
+
+    private void ensureSuperAdmin(Tenant tenant) {
+        userRepo.findByUsername("superadmin").ifPresentOrElse(user -> {
+            user.setAppUserRole(AppUserRole.SUPER_ADMIN);
+            user.setPhoneNumber("1140000000");
+            user.setTenant(tenant);
+            if (resetSeedPasswords && hasText(superadminInitialPassword)) {
+                user.setPassword(passwordEncoder.encode(superadminInitialPassword));
+                log.warn("Reset seed password for username='superadmin'");
+            }
+            userRepo.save(user);
+        }, () -> {
+            if (!hasText(superadminInitialPassword)) {
+                log.warn("Skipping superadmin seed because APP_SUPERADMIN_INITIAL_PASSWORD is not set");
+                return;
+            }
+            AppUser u = new AppUser("superadmin", passwordEncoder.encode(superadminInitialPassword),
+                    AppUserRole.SUPER_ADMIN, "1140000000");
+            u.setTenant(tenant);
+            userRepo.save(u);
         });
     }
 
@@ -94,6 +119,10 @@ public class DataLoader implements CommandLineRunner {
         user.setPhoneNumber(phone);
         user.setTenant(tenant);
         return userRepo.save(user);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     // ─── Orders ──────────────────────────────────────────────────────────────
@@ -313,35 +342,36 @@ public class DataLoader implements CommandLineRunner {
 
     // ─── Costs ───────────────────────────────────────────────────────────────
 
-    private void seedCosts() {
+    private void seedCosts(Tenant tenant) {
         // February costs
-        cost(CostType.RENT,     d("2026-02-01"), 250_000, PaymentFrequency.MONTHLY,  "Alquiler depósito febrero");
-        cost(CostType.SALARY,   d("2026-02-28"), 480_000, PaymentFrequency.MONTHLY,  "Sueldo administrativo Juan");
-        cost(CostType.SALARY,   d("2026-02-28"), 350_000, PaymentFrequency.MONTHLY,  "Sueldo asistente Pablo");
-        cost(CostType.SERVICES, d("2026-02-10"),  42_500, PaymentFrequency.MONTHLY,  "Luz y gas depósito");
-        cost(CostType.SERVICES, d("2026-02-12"),   8_900, PaymentFrequency.MONTHLY,  "Internet fibra óptica");
-        cost(CostType.ADS,      d("2026-02-20"),  25_000, PaymentFrequency.MONTHLY,  "Publicidad digital");
-        cost(CostType.TAX,      d("2026-02-22"),  68_000, PaymentFrequency.MONTHLY,  "Monotributo AFIP febrero");
+        cost(tenant, CostType.RENT,     d("2026-02-01"), 250_000, PaymentFrequency.MONTHLY,  "Alquiler depósito febrero");
+        cost(tenant, CostType.SALARY,   d("2026-02-28"), 480_000, PaymentFrequency.MONTHLY,  "Sueldo administrativo Juan");
+        cost(tenant, CostType.SALARY,   d("2026-02-28"), 350_000, PaymentFrequency.MONTHLY,  "Sueldo asistente Pablo");
+        cost(tenant, CostType.SERVICES, d("2026-02-10"),  42_500, PaymentFrequency.MONTHLY,  "Luz y gas depósito");
+        cost(tenant, CostType.SERVICES, d("2026-02-12"),   8_900, PaymentFrequency.MONTHLY,  "Internet fibra óptica");
+        cost(tenant, CostType.ADS,      d("2026-02-20"),  25_000, PaymentFrequency.MONTHLY,  "Publicidad digital");
+        cost(tenant, CostType.TAX,      d("2026-02-22"),  68_000, PaymentFrequency.MONTHLY,  "Monotributo AFIP febrero");
 
         // March costs
-        cost(CostType.RENT,     d("2026-03-01"), 250_000, PaymentFrequency.MONTHLY,  "Alquiler depósito marzo");
-        cost(CostType.SALARY,   d("2026-03-31"), 480_000, PaymentFrequency.MONTHLY,  "Sueldo administrativo Juan");
-        cost(CostType.SALARY,   d("2026-03-31"), 350_000, PaymentFrequency.MONTHLY,  "Sueldo asistente Pablo");
-        cost(CostType.SERVICES, d("2026-03-10"),  44_800, PaymentFrequency.MONTHLY,  "Luz y gas depósito");
-        cost(CostType.SERVICES, d("2026-03-12"),   8_900, PaymentFrequency.MONTHLY,  "Internet fibra óptica");
-        cost(CostType.ADS,      d("2026-03-20"),  30_000, PaymentFrequency.MONTHLY,  "Publicidad digital");
-        cost(CostType.TAX,      d("2026-03-22"),  68_000, PaymentFrequency.MONTHLY,  "Monotributo AFIP marzo");
-        cost(CostType.OTHERS,   d("2026-03-25"),  18_500, PaymentFrequency.ONE_TIME, "Reparación vehículo de reparto");
+        cost(tenant, CostType.RENT,     d("2026-03-01"), 250_000, PaymentFrequency.MONTHLY,  "Alquiler depósito marzo");
+        cost(tenant, CostType.SALARY,   d("2026-03-31"), 480_000, PaymentFrequency.MONTHLY,  "Sueldo administrativo Juan");
+        cost(tenant, CostType.SALARY,   d("2026-03-31"), 350_000, PaymentFrequency.MONTHLY,  "Sueldo asistente Pablo");
+        cost(tenant, CostType.SERVICES, d("2026-03-10"),  44_800, PaymentFrequency.MONTHLY,  "Luz y gas depósito");
+        cost(tenant, CostType.SERVICES, d("2026-03-12"),   8_900, PaymentFrequency.MONTHLY,  "Internet fibra óptica");
+        cost(tenant, CostType.ADS,      d("2026-03-20"),  30_000, PaymentFrequency.MONTHLY,  "Publicidad digital");
+        cost(tenant, CostType.TAX,      d("2026-03-22"),  68_000, PaymentFrequency.MONTHLY,  "Monotributo AFIP marzo");
+        cost(tenant, CostType.OTHERS,   d("2026-03-25"),  18_500, PaymentFrequency.ONE_TIME, "Reparación vehículo de reparto");
 
         // April costs (partial month)
-        cost(CostType.RENT,     d("2026-04-01"), 250_000, PaymentFrequency.MONTHLY,  "Alquiler depósito abril");
-        cost(CostType.SALARY,   d("2026-04-15"), 480_000, PaymentFrequency.MONTHLY,  "Sueldo administrativo Juan");
-        cost(CostType.SALARY,   d("2026-04-15"), 350_000, PaymentFrequency.MONTHLY,  "Sueldo asistente Pablo");
-        cost(CostType.SERVICES, d("2026-04-10"),  46_200, PaymentFrequency.MONTHLY,  "Luz y gas depósito");
+        cost(tenant, CostType.RENT,     d("2026-04-01"), 250_000, PaymentFrequency.MONTHLY,  "Alquiler depósito abril");
+        cost(tenant, CostType.SALARY,   d("2026-04-15"), 480_000, PaymentFrequency.MONTHLY,  "Sueldo administrativo Juan");
+        cost(tenant, CostType.SALARY,   d("2026-04-15"), 350_000, PaymentFrequency.MONTHLY,  "Sueldo asistente Pablo");
+        cost(tenant, CostType.SERVICES, d("2026-04-10"),  46_200, PaymentFrequency.MONTHLY,  "Luz y gas depósito");
     }
 
-    private void cost(CostType type, LocalDate date, int amount, PaymentFrequency freq, String reason) {
+    private void cost(Tenant tenant, CostType type, LocalDate date, int amount, PaymentFrequency freq, String reason) {
         Costs c = new Costs();
+        c.setTenant(tenant);
         c.setCostType(type);
         c.setDate(date);
         c.setAmount(new BigDecimal(amount));
