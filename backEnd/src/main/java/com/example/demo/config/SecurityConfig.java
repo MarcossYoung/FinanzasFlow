@@ -14,6 +14,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -25,6 +26,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -75,31 +77,31 @@ public class SecurityConfig {
                         // Existing public paths
                         .requestMatchers("/api/users/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/users/registro").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
-                        .requestMatchers("/api/payments", "/api/payments/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN", "GESTOR")
-                        .requestMatchers("/api/workorders", "/api/workorders/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN", "GESTOR")
+                        .requestMatchers("/api/payments", "/api/payments/**").hasAnyAuthority("ADMIN", "GESTOR")
+                        .requestMatchers("/api/workorders", "/api/workorders/**").hasAnyAuthority("ADMIN", "GESTOR")
 
                         // Invoice sub-routes that require auth (must come before the products permitAll catch-all)
                         .requestMatchers(HttpMethod.POST, "/api/telegram/webhook").permitAll()
-                        .requestMatchers("/api/customers/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN", "GESTOR")
-                        .requestMatchers("/api/invoices/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN", "GESTOR")
+                        .requestMatchers("/api/customers/**").hasAnyAuthority("ADMIN", "GESTOR")
+                        .requestMatchers("/api/invoices/**").hasAnyAuthority("ADMIN", "GESTOR")
                         .requestMatchers("/api/operator/**").hasAuthority("SUPER_ADMIN")
 
                         // Existing restricted paths
                         .requestMatchers("/error").permitAll()
 
-                        .requestMatchers(HttpMethod.GET, "/api/admin/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/admin/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/admin/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/admin/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/admin/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/admin/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/admin/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/admin/**").hasAuthority("ADMIN")
 
-                        .requestMatchers(HttpMethod.GET, "/api/costs/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/costs/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/costs/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/costs/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/costs/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/costs/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/costs/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/costs/**").hasAuthority("ADMIN")
 
-                        .requestMatchers("/api/finance", "/api/finance/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN", "GESTOR")
-                        .requestMatchers("/api/ai/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN", "GESTOR")
-                        .requestMatchers("/api/payment-options", "/api/payment-options/**").hasAnyAuthority("ADMIN", "SUPER_ADMIN", "GESTOR")
+                        .requestMatchers("/api/finance", "/api/finance/**").hasAnyAuthority("ADMIN", "GESTOR")
+                        .requestMatchers("/api/ai/**").hasAnyAuthority("ADMIN", "GESTOR")
+                        .requestMatchers("/api/payment-options", "/api/payment-options/**").hasAnyAuthority("ADMIN", "GESTOR")
 
                         .requestMatchers(HttpMethod.GET, "/api/users").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
 

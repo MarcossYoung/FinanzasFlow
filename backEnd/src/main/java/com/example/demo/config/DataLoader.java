@@ -57,7 +57,7 @@ public class DataLoader implements CommandLineRunner {
         userRepo.deleteViewerUsers();
 
         Tenant defaultTenant = ensureTenant("Demo Distribuidora", "distribuidora-demo");
-        ensureSuperAdmin(defaultTenant);
+        ensureSuperAdmin();
         AppUser admin  = ensureUser("admin",  "admin123",  AppUserRole.ADMIN,  "1140000001", defaultTenant);
         AppUser carlos = ensureUser("carlos", "gestor123", AppUserRole.GESTOR, "1140000002", defaultTenant);
         AppUser laura  = ensureUser("laura",  "gestor123", AppUserRole.GESTOR, "1140000003", defaultTenant);
@@ -81,11 +81,11 @@ public class DataLoader implements CommandLineRunner {
         });
     }
 
-    private void ensureSuperAdmin(Tenant tenant) {
+    private void ensureSuperAdmin() {
         userRepo.findByUsername("superadmin").ifPresentOrElse(user -> {
             user.setAppUserRole(AppUserRole.SUPER_ADMIN);
             user.setPhoneNumber("1140000000");
-            user.setTenant(tenant);
+            user.setTenant(null);
             if (resetSeedPasswords && hasText(superadminInitialPassword)) {
                 user.setPassword(passwordEncoder.encode(superadminInitialPassword));
                 log.warn("Reset seed password for username='superadmin'");
@@ -98,7 +98,7 @@ public class DataLoader implements CommandLineRunner {
             }
             AppUser u = new AppUser("superadmin", passwordEncoder.encode(superadminInitialPassword),
                     AppUserRole.SUPER_ADMIN, "1140000000");
-            u.setTenant(tenant);
+            u.setTenant(null);
             userRepo.save(u);
         });
     }

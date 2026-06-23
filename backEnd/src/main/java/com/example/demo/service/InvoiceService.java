@@ -42,6 +42,7 @@ public class InvoiceService {
     private final TenantRepo tenantRepo;
     private final UserRepo userRepo;
     private final RestTemplate restTemplate;
+    private final ActivityLogService activityLogService;
 
     @Value("${n8n.webhook.product-created:}")
     private String n8nWebhookUrl;
@@ -53,7 +54,8 @@ public class InvoiceService {
                           CustomerRepo customerRepo,
                           TenantRepo tenantRepo,
                           UserRepo userRepo,
-                          RestTemplate restTemplate) {
+                          RestTemplate restTemplate,
+                          ActivityLogService activityLogService) {
         this.InvoiceRepo = InvoiceRepo;
         this.workOrderRepo = workOrderRepo;
         this.userService = userService;
@@ -62,6 +64,7 @@ public class InvoiceService {
         this.tenantRepo = tenantRepo;
         this.userRepo = userRepo;
         this.restTemplate = restTemplate;
+        this.activityLogService = activityLogService;
     }
 
     // ---------------- CREATE ----------------
@@ -135,6 +138,7 @@ public class InvoiceService {
         }
 
         scheduleN8nWebhookAfterCommit(saved);
+        activityLogService.record(tenant.getId(), ActivityLogService.INVOICE_CREATED, owner.getId());
 
         return InvoiceResponse.from(saved);
     }

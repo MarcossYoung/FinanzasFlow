@@ -17,7 +17,8 @@ import static org.mockito.Mockito.mock;
 class LedgerIngestionServiceTest {
     private final LedgerIngestionService service = new LedgerIngestionService(
             mock(TelegramLedgerIngestionRepo.class), mock(TenantRepo.class), mock(CustomerRepo.class),
-            mock(InvoiceService.class), mock(CostService.class), mock(PlatformTransactionManager.class));
+            mock(InvoiceService.class), mock(CostService.class), mock(PlatformTransactionManager.class),
+            mock(ActivityLogService.class));
 
     @Test
     void acceptsPositiveConsistentExtraction() {

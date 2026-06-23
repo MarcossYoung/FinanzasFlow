@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 
-@PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
+@PreAuthorize("hasAuthority('ADMIN')")
 @RestController
 @RequestMapping("/api/admin")
 public class AdminController {
@@ -44,9 +44,7 @@ public class AdminController {
     @GetMapping("/users")
     public ResponseEntity<List<UserSummaryDto>> getAllUsers(){
         AppUser currentUser = appUserService.getCurrentUser();
-        Long tenantId = currentUser != null && currentUser.getTenant() != null
-                ? currentUser.getTenant().getId()
-                : null;
+        Long tenantId = currentUser.getTenant().getId();
         return ResponseEntity.ok(appUserService.getUsersForTenant(tenantId));
     }
 
@@ -125,32 +123,22 @@ public class AdminController {
 
         // === 1. Total Users ===
         AppUser currentUser = appUserService.getCurrentUser();
-        Long tenantId = currentUser != null && currentUser.getTenant() != null
-                ? currentUser.getTenant().getId()
-                : null;
-        long totalUsers = tenantId != null
-                ? appUserService.getUsersForTenant(tenantId).size()
-                : appUserService.countUsers();
+        Long tenantId = currentUser.getTenant().getId();
+        long totalUsers = appUserService.getUsersForTenant(tenantId).size();
 
         // === 2. Total Orders ===
         long totalOrders = InvoiceService.countOrders();
 
         // === 3. Finished Orders ===
-        long finishedOrders = tenantId != null
-                ? workOrderService.countByTypeForTenant(Status.CERRADO, tenantId)
-                : workOrderService.countByType(Status.CERRADO);
+        long finishedOrders = workOrderService.countByTypeForTenant(Status.CERRADO, tenantId);
 
         // === 4. Due This Week ===
         LocalDate today = LocalDate.now();
         LocalDate endOfWeek = today.plusDays(7);
-        long dueThisWeek = tenantId != null
-                ? workOrderService.countDueBetweenForTenant(tenantId, today, endOfWeek)
-                : workOrderService.countDueBetween(today, endOfWeek);
+        long dueThisWeek = workOrderService.countDueBetweenForTenant(tenantId, today, endOfWeek);
 
         // === 5. Orders by Status ===
-        Map<String, Long> ordersByStatus = tenantId != null
-                ? workOrderService.countOrdersByStatusForTenant(tenantId)
-                : workOrderService.countOrdersByStatus();
+        Map<String, Long> ordersByStatus = workOrderService.countOrdersByStatusForTenant(tenantId);
 
 
         // === 7. Top Products ===

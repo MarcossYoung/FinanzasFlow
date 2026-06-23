@@ -1,6 +1,8 @@
 package com.example.demo.config;
 
 import com.example.demo.service.CustomUserDetailsService;
+import com.example.demo.model.AppUser;
+import com.example.demo.model.AppUserRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
@@ -67,6 +69,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
+                if (userDetails instanceof AppUser appUser
+                        && appUser.getAppUserRole() != AppUserRole.SUPER_ADMIN
+                        && (appUser.getTenant() == null || !appUser.getTenant().isActive())) {
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Tenant inactive");
+                    return;
+                }
 
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(

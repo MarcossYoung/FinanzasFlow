@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface TenantRepo extends JpaRepository<Tenant, Long> {
     Optional<Tenant> findBySlug(String slug);
+
+    boolean existsBySlug(String slug);
 }

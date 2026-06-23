@@ -29,6 +29,7 @@ public class LedgerIngestionService {
     private final CustomerRepo customerRepo;
     private final InvoiceService invoiceService;
     private final CostService costService;
+    private final ActivityLogService activityLogService;
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules()
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
@@ -41,12 +42,14 @@ public class LedgerIngestionService {
                                   CustomerRepo customerRepo,
                                   InvoiceService invoiceService,
                                   CostService costService,
-                                  PlatformTransactionManager transactionManager) {
+                                  PlatformTransactionManager transactionManager,
+                                  ActivityLogService activityLogService) {
         this.ingestionRepo = ingestionRepo;
         this.tenantRepo = tenantRepo;
         this.customerRepo = customerRepo;
         this.invoiceService = invoiceService;
         this.costService = costService;
+        this.activityLogService = activityLogService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
@@ -158,6 +161,7 @@ public class LedgerIngestionService {
         ingestion.setRecordId(recordId);
         ingestion.setStatus(TelegramIngestionStatus.COMPLETED);
         ingestion.setUpdatedAt(LocalDateTime.now());
+        activityLogService.record(tenantId, ActivityLogService.TELEGRAM_INGESTION, ownerId);
         return resultFrom(ingestion, extraction, false);
     }
 

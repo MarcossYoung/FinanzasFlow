@@ -18,12 +18,18 @@ public class CostService {
     private final TenantRepo tenantRepo;
     private final UserRepo userRepo;
     private final AppUserService appUserService;
+    private final ActivityLogService activityLogService;
 
-    public CostService(CostRepo costRepo, TenantRepo tenantRepo, UserRepo userRepo, AppUserService appUserService) {
+    public CostService(CostRepo costRepo,
+                       TenantRepo tenantRepo,
+                       UserRepo userRepo,
+                       AppUserService appUserService,
+                       ActivityLogService activityLogService) {
         this.costRepo = costRepo;
         this.tenantRepo = tenantRepo;
         this.userRepo = userRepo;
         this.appUserService = appUserService;
+        this.activityLogService = activityLogService;
     }
 
     @Transactional
@@ -59,6 +65,8 @@ public class CostService {
         cost.setCreatedAt(LocalDateTime.now());
         cost.setTenant(tenant);
         cost.setOwner(owner);
-        return costRepo.save(cost);
+        Costs saved = costRepo.save(cost);
+        activityLogService.record(tenant.getId(), ActivityLogService.COST_CREATED, owner.getId());
+        return saved;
     }
 }

@@ -4,6 +4,7 @@ import com.example.demo.dto.UserSummaryDto;
 import com.example.demo.exceptions.UserAlreadyExistsException;
 import com.example.demo.model.AppUser;
 import com.example.demo.model.AppUserRole;
+import com.example.demo.model.Tenant;
 import com.example.demo.repository.UserRepo;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -19,6 +20,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.spec.SecretKeySpec;
 import java.security.Key;
@@ -71,6 +73,9 @@ public class AppUserService {
                 throw new UsernameNotFoundException("User not found: " + username);
             }
             AppUser foundUser = userLookup.get();
+            if (!isAllowedByTenantState(foundUser)) {
+                throw new BadCredentialsException("Tenant is inactive");
+            }
 
             if (password == null || !passwordEncoder.matches(password, foundUser.getPassword())) {
                 recordFailedLogin(username);
@@ -122,6 +127,31 @@ public class AppUserService {
             user.setTenant(creator.getTenant());
         }
 
+        return appUserRepository.save(user);
+    }
+
+    @Transactional
+    public AppUser createTenantUser(Tenant tenant, String username, String rawPassword, AppUserRole role) {
+        if (tenant == null || tenant.getId() == null) {
+            throw new IllegalArgumentException("Tenant is required");
+        }
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException("Username is required");
+        }
+        if (rawPassword == null || rawPassword.length() < 8) {
+            throw new IllegalArgumentException("Password must be at least 8 characters");
+        }
+        if (role == AppUserRole.SUPER_ADMIN) {
+            throw new IllegalArgumentException("Tenant users cannot be SUPER_ADMIN");
+        }
+        if (appUserRepository.existsByUsername(username.trim())) {
+            throw new UserAlreadyExistsException("Usuario ya existe");
+        }
+        AppUser user = new AppUser();
+        user.setUsername(username.trim());
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setAppUserRole(role != null ? role : AppUserRole.ADMIN);
+        user.setTenant(tenant);
         return appUserRepository.save(user);
     }
 
@@ -190,8 +220,14 @@ public class AppUserService {
     public List<UserSummaryDto> getUsersForTenant(Long tenantId) {
         return appUserRepository.findAll().stream()
                 .filter(u -> u.getTenant() != null && u.getTenant().getId().equals(tenantId))
+                .filter(u -> u.getAppUserRole() != AppUserRole.SUPER_ADMIN)
                 .map(u -> new UserSummaryDto(u.getId(), u.getUsername(), u.getAppUserRole().name()))
                 .collect(java.util.stream.Collectors.toList());
+    }
+
+    private boolean isAllowedByTenantState(AppUser user) {
+        if (user.getAppUserRole() == AppUserRole.SUPER_ADMIN) return true;
+        return user.getTenant() != null && user.getTenant().isActive();
     }
 
     private void assertLoginAllowed(String username) {

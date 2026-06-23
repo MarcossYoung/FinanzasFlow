@@ -1,6 +1,7 @@
 package com.example.demo.repository;
 
 import com.example.demo.model.AppUser;
+import com.example.demo.model.AppUserRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -24,6 +25,8 @@ public interface UserRepo extends JpaRepository<AppUser, Long> {
 
 
     boolean existsByUsername(String username);
+
+    long countByTenant_IdAndAppUserRoleNot(Long tenantId, AppUserRole role);
 
     @Modifying
     @Transactional

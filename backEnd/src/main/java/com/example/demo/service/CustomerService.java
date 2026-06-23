@@ -3,6 +3,7 @@ package com.example.demo.service;
 import com.example.demo.config.TenantContext;
 import com.example.demo.dto.CustomerCreateRequest;
 import com.example.demo.dto.CustomerResponse;
+import com.example.demo.model.AppUser;
 import com.example.demo.model.Customer;
 import com.example.demo.model.Tenant;
 import com.example.demo.repository.CustomerRepo;
@@ -16,10 +17,17 @@ import java.util.List;
 public class CustomerService {
     private final CustomerRepo customerRepo;
     private final TenantRepo tenantRepo;
+    private final AppUserService appUserService;
+    private final ActivityLogService activityLogService;
 
-    public CustomerService(CustomerRepo customerRepo, TenantRepo tenantRepo) {
+    public CustomerService(CustomerRepo customerRepo,
+                           TenantRepo tenantRepo,
+                           AppUserService appUserService,
+                           ActivityLogService activityLogService) {
         this.customerRepo = customerRepo;
         this.tenantRepo = tenantRepo;
+        this.appUserService = appUserService;
+        this.activityLogService = activityLogService;
     }
 
     public List<CustomerResponse> findByTenant() {
@@ -36,7 +44,11 @@ public class CustomerService {
         customer.setTenant(tenant());
         customer.setCreatedAt(LocalDateTime.now());
         if (customer.getPaymentScore() == null) customer.setPaymentScore(100);
-        return CustomerResponse.from(customerRepo.save(customer));
+        Customer saved = customerRepo.save(customer);
+        AppUser actor = appUserService.getCurrentUser();
+        Long actorId = actor != null ? actor.getId() : null;
+        activityLogService.record(saved.getTenant().getId(), ActivityLogService.CUSTOMER_CREATED, actorId);
+        return CustomerResponse.from(saved);
     }
 
     public CustomerResponse update(Long id, CustomerCreateRequest req) {
