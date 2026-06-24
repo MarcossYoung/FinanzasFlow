@@ -19,6 +19,8 @@ import com.example.demo.service.LedgerIngestionService;
 import com.example.demo.service.TelegramConnectionService;
 import com.example.demo.service.TelegramIngestionWorker;
 import com.example.demo.service.TelegramService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -43,8 +45,10 @@ import java.util.concurrent.RejectedExecutionException;
 @RestController
 @RequestMapping("/api/telegram")
 public class TelegramWebhookController {
+    private static final Logger log = LoggerFactory.getLogger(TelegramWebhookController.class);
     private static final int OVERDUE_LIMIT = 15;
     private static final String CONNECT_INSTRUCTIONS = "Para conectar este chat, genera un codigo en Admin > Telegram y envia /connect CODIGO desde un chat privado.";
+    private static final String RECONNECT_INSTRUCTIONS = "Este chat no esta conectado. Reconecta con /connect.";
     private static final String PRIVATE_ONLY = "Telegram se conecta solo desde un chat privado con el bot.";
 
     private final CustomerRepo customerRepo;
@@ -147,7 +151,8 @@ public class TelegramWebhookController {
                 TenantContext.clear();
             }
             return ResponseEntity.ok().build();
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("Telegram webhook processing failed", e);
             return ResponseEntity.ok().build();
         }
     }
@@ -239,6 +244,7 @@ public class TelegramWebhookController {
         Map<?, ?> chat = message == null ? null : asMap(message.get("chat"));
         String chatId = chat == null ? "" : stringValue(chat.get("id"));
         Long callbackMessageId = message == null ? null : numberValue(message.get("message_id"));
+        answerCallbackQuery(callbackId, chatId);
 
         String[] parts = stringValue(callback.get("data")).split(":");
         if (parts.length != 3 || !"ledger".equals(parts[0])) return;
@@ -251,13 +257,16 @@ public class TelegramWebhookController {
         }
         if (ingestionId == null) return;
 
-        connectionService.resolveConnection(chatId).ifPresentOrElse(connection -> {
-            if (!callbackId.isBlank()) {
-                try {
-                    telegramService.answerCallbackQuery(callbackId);
-                } catch (Exception ignored) {
-                }
-            }
+        Optional<TelegramConnection> resolvedConnection;
+        try {
+            resolvedConnection = connectionService.resolveConnection(chatId);
+        } catch (Exception e) {
+            log.error("Failed to resolve Telegram callback connection for chatId={}, ingestionId={}",
+                    chatId, ingestionId, e);
+            throw e;
+        }
+
+        resolvedConnection.ifPresentOrElse(connection -> {
             Long tenantId = connection.getTenant().getId();
             Long ownerId = connection.getDefaultOwner() == null ? null : connection.getDefaultOwner().getId();
             if (ownerId == null) {
@@ -275,7 +284,20 @@ public class TelegramWebhookController {
             } finally {
                 TenantContext.clear();
             }
-        }, () -> telegramService.sendMessage(chatId, CONNECT_INSTRUCTIONS));
+        }, () -> {
+            log.warn("Telegram callback for chatId={} ingestionId={} has no enabled connection", chatId, ingestionId);
+            telegramService.sendMessage(chatId, RECONNECT_INSTRUCTIONS);
+        });
+    }
+
+    private void answerCallbackQuery(String callbackId, String chatId) {
+        if (callbackId.isBlank()) return;
+        try {
+            telegramService.answerCallbackQuery(callbackId);
+        } catch (Exception e) {
+            log.warn("Failed to answer Telegram callback query callbackId={} chatId={}",
+                    callbackId, chatId, e);
+        }
     }
 
     private void handleAdminCommand(TelegramConnection connection, String chatId, String text) {

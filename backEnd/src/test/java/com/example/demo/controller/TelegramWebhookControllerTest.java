@@ -106,6 +106,23 @@ class TelegramWebhookControllerTest {
     }
 
     @Test
+    void callbackWithoutConnectionStillAnswersAndDoesNotFinalize() {
+        when(connectionService.resolveConnection("42")).thenReturn(Optional.empty());
+        TelegramWebhookController controller = controller();
+        Map<String, Object> update = Map.of("callback_query", Map.of(
+                "id", "callback-1",
+                "from", Map.of("id", 99),
+                "message", Map.of("message_id", 70, "chat", Map.of("id", 42)),
+                "data", "ledger:7:COBRO"
+        ));
+
+        assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
+        verify(telegramService).answerCallbackQuery("callback-1");
+        verify(telegramService).sendMessage("42", "Este chat no esta conectado. Reconecta con /connect.");
+        verify(ingestionService, never()).finalizeDirection(anyLong(), anyString(), anyLong(), any(), anyLong(), any());
+    }
+
+    @Test
     void callbackFailureMarksIngestionFailedAndSendsSafeMessage() {
         when(connectionService.resolveConnection("42")).thenReturn(Optional.of(connection(1L, 2L)));
         when(ingestionService.finalizeDirection(7L, "42", 1L, 70L, 2L, LedgerDirection.COBRO))
