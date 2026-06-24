@@ -136,11 +136,16 @@ public class LedgerIngestionService {
 
     @Transactional
     public LedgerIngestionResult finalizeDirection(Long ingestionId, String chatId, Long tenantId,
+                                                    Long callbackMessageId,
                                                     Long ownerId, LedgerDirection direction) {
         TelegramLedgerIngestion ingestion = ingestionRepo.findLockedById(ingestionId)
                 .orElseThrow(() -> new IllegalArgumentException("Ingestion not found"));
         if (!ingestion.getChatId().equals(chatId) || !ingestion.getTenant().getId().equals(tenantId)) {
             throw new SecurityException("Ingestion does not belong to this chat and tenant");
+        }
+        if (callbackMessageId == null || ingestion.getCallbackMessageId() == null
+                || !ingestion.getCallbackMessageId().equals(callbackMessageId)) {
+            throw new SecurityException("Callback does not belong to this pending ingestion");
         }
         LedgerExtraction extraction = normalizeExtraction(readExtraction(ingestion));
         if (ingestion.getStatus() == TelegramIngestionStatus.COMPLETED) {

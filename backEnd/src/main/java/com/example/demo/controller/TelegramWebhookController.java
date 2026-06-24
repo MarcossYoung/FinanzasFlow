@@ -238,6 +238,7 @@ public class TelegramWebhookController {
         Map<?, ?> message = asMap(callback.get("message"));
         Map<?, ?> chat = message == null ? null : asMap(message.get("chat"));
         String chatId = chat == null ? "" : stringValue(chat.get("id"));
+        Long callbackMessageId = message == null ? null : numberValue(message.get("message_id"));
 
         String[] parts = stringValue(callback.get("data")).split(":");
         if (parts.length != 3 || !"ledger".equals(parts[0])) return;
@@ -266,7 +267,7 @@ public class TelegramWebhookController {
             TenantContext.set(tenantId);
             try {
                 LedgerIngestionResult result = ingestionService.finalizeDirection(
-                        ingestionId, chatId, tenantId, ownerId, direction);
+                        ingestionId, chatId, tenantId, callbackMessageId, ownerId, direction);
                 telegramService.sendMessage(chatId, ingestionWorker.completedText(result));
             } catch (Exception e) {
                 ingestionService.markFailed(ingestionId, e.getMessage());

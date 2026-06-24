@@ -88,28 +88,46 @@ class TelegramWebhookControllerTest {
                 7L, LedgerDirection.COBRO, LedgerRecordType.INVOICE, 11L,
                 new BigDecimal("123.45"), "ACME", LocalDate.of(2026, 6, 24), false);
         when(connectionService.resolveConnection("42")).thenReturn(Optional.of(connection(1L, 2L)));
-        when(ingestionService.finalizeDirection(7L, "42", 1L, 2L, LedgerDirection.COBRO))
+        when(ingestionService.finalizeDirection(7L, "42", 1L, 70L, 2L, LedgerDirection.COBRO))
                 .thenReturn(result);
         when(worker.completedText(result)).thenReturn("Guardado como invoice: #11");
         TelegramWebhookController controller = controller();
         Map<String, Object> update = Map.of("callback_query", Map.of(
                 "id", "callback-1",
                 "from", Map.of("id", 99),
-                "message", Map.of("chat", Map.of("id", 42)),
+                "message", Map.of("message_id", 70, "chat", Map.of("id", 42)),
                 "data", "ledger:7:COBRO"
         ));
 
         assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
         verify(telegramService).answerCallbackQuery("callback-1");
-        verify(ingestionService).finalizeDirection(7L, "42", 1L, 2L, LedgerDirection.COBRO);
+        verify(ingestionService).finalizeDirection(7L, "42", 1L, 70L, 2L, LedgerDirection.COBRO);
         verify(telegramService).sendMessage("42", "Guardado como invoice: #11");
     }
 
     @Test
     void callbackFailureMarksIngestionFailedAndSendsSafeMessage() {
         when(connectionService.resolveConnection("42")).thenReturn(Optional.of(connection(1L, 2L)));
-        when(ingestionService.finalizeDirection(7L, "42", 1L, 2L, LedgerDirection.COBRO))
+        when(ingestionService.finalizeDirection(7L, "42", 1L, 70L, 2L, LedgerDirection.COBRO))
                 .thenThrow(new IllegalArgumentException("El total debe ser positivo"));
+        TelegramWebhookController controller = controller();
+        Map<String, Object> update = Map.of("callback_query", Map.of(
+                "id", "callback-1",
+                "from", Map.of("id", 42),
+                "message", Map.of("message_id", 70, "chat", Map.of("id", 42)),
+                "data", "ledger:7:COBRO"
+        ));
+
+        assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
+        verify(ingestionService).markFailed(7L, "El total debe ser positivo");
+        verify(telegramService).sendMessage("42", "No pude guardar el registro. Revisa el documento o intenta nuevamente.");
+    }
+
+    @Test
+    void callbackWithoutMessageIdDoesNotFinalizePendingIngestion() {
+        when(connectionService.resolveConnection("42")).thenReturn(Optional.of(connection(1L, 2L)));
+        when(ingestionService.finalizeDirection(7L, "42", 1L, null, 2L, LedgerDirection.COBRO))
+                .thenThrow(new SecurityException("Callback does not belong to this pending ingestion"));
         TelegramWebhookController controller = controller();
         Map<String, Object> update = Map.of("callback_query", Map.of(
                 "id", "callback-1",
@@ -119,7 +137,7 @@ class TelegramWebhookControllerTest {
         ));
 
         assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
-        verify(ingestionService).markFailed(7L, "El total debe ser positivo");
+        verify(ingestionService).markFailed(7L, "Callback does not belong to this pending ingestion");
         verify(telegramService).sendMessage("42", "No pude guardar el registro. Revisa el documento o intenta nuevamente.");
     }
 
