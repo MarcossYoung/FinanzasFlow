@@ -89,6 +89,7 @@ public class SecurityConfig {
                         // Existing restricted paths
                         .requestMatchers("/error").permitAll()
 
+                        .requestMatchers("/api/admin/telegram/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/admin/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/admin/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/admin/**").hasAuthority("ADMIN")

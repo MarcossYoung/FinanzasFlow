@@ -9,6 +9,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.List;
+
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
@@ -59,6 +61,31 @@ class AiServiceTest {
         server.verify();
     }
 
+    @Test
+    void rejectsIncompleteOrWronglyTypedExtractions() {
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        AiService service = service(restTemplate);
+        List.of(
+                "[]",
+                "{\"counterpartyName\":\"ACME\",\"amount\":\"14500\"}",
+                "{\"counterpartyName\":\"ACME\",\"amount\":14500,\"issueDate\":\"24/06/2026\"}",
+                "{\"counterpartyName\":\"ACME\"}",
+                "{\"counterpartyName\":\"ACME\",\"amount\":-1}",
+                "{\"amount\":14500}",
+                "{\"counterpartyName\":\"ACME\",\"amount\":14500,\"lineItems\":\"bad\"}",
+                "{\"counterpartyName\":\"ACME\",\"amount\":14500,\"lineItems\":[{\"description\":5}]}"
+        ).forEach(raw -> server.expect(requestTo(containsString("/v1/messages")))
+                .andRespond(withSuccess(anthropicTextResponse(raw), MediaType.APPLICATION_JSON)));
+
+        for (int i = 0; i < 8; i++) {
+            AiServiceException error = assertThrows(AiServiceException.class,
+                    () -> service.parseLedgerText("bad"));
+            assertEquals(AiServiceException.Reason.INVALID_JSON, error.getReason());
+        }
+        server.verify();
+    }
+
     private AiService service(RestTemplate restTemplate) {
         AiService service = new AiService(mock(FinanceService.class), mock(InvoiceService.class), restTemplate);
         ReflectionTestUtils.setField(service, "apiKey", "test-key");
@@ -67,5 +94,9 @@ class AiServiceTest {
 
     private String jsonString(String value) {
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\"";
+    }
+
+    private String anthropicTextResponse(String text) {
+        return "{\"content\":[{\"type\":\"text\",\"text\":" + jsonString(text) + "}]}";
     }
 }

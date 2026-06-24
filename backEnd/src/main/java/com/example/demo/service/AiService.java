@@ -2,9 +2,11 @@ package com.example.demo.service;
 
 import com.example.demo.dto.FinanceDashboardResponse;
 import com.example.demo.dto.InvoiceResponse;
+import com.example.demo.dto.LedgerLineItemExtraction;
 import com.example.demo.dto.LedgerExtraction;
 import com.example.demo.exceptions.AiServiceException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
@@ -12,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -27,7 +30,8 @@ public class AiService {
     private final FinanceService financeService;
     private final InvoiceService invoiceService;
     private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules()
+            .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
 
     @Value("${anthropic.api.key:}")
     private String apiKey;
@@ -155,12 +159,92 @@ public class AiService {
 
     private LedgerExtraction parseLedgerJson(String raw) {
         try {
-            return objectMapper.readValue(cleanJson(raw), LedgerExtraction.class);
+            Object parsed = objectMapper.readValue(cleanJson(raw), Object.class);
+            if (!(parsed instanceof Map<?, ?> map)) {
+                throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude extraction root must be an object");
+            }
+            LedgerExtraction extraction = new LedgerExtraction(
+                    stringField(map, "titulo"),
+                    stringField(map, "counterpartyName"),
+                    stringField(map, "cuitDni"),
+                    stringField(map, "email"),
+                    stringField(map, "phone"),
+                    decimalField(map, "amount"),
+                    dateField(map, "issueDate"),
+                    dateField(map, "dueDate"),
+                    stringField(map, "description"),
+                    lineItemsField(map)
+            );
+            if (extraction.amount() == null || extraction.amount().signum() <= 0) {
+                throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude extraction omitted a positive amount");
+            }
+            if (isBlank(extraction.counterpartyName()) && isBlank(extraction.cuitDni()) && isBlank(extraction.email())) {
+                throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude extraction omitted counterparty identity");
+            }
+            return extraction;
         } catch (AiServiceException e) {
             throw e;
         } catch (Exception e) {
             throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude returned invalid extraction JSON", e);
         }
+    }
+
+    private String stringField(Map<?, ?> map, String key) {
+        Object value = map.get(key);
+        if (value == null) return null;
+        if (value instanceof String text) return text;
+        throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude returned invalid " + key);
+    }
+
+    private BigDecimal decimalField(Map<?, ?> map, String key) {
+        Object value = map.get(key);
+        if (value == null) return null;
+        if (value instanceof Number number) {
+            try {
+                return new BigDecimal(number.toString());
+            } catch (NumberFormatException e) {
+                throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude returned invalid " + key, e);
+            }
+        }
+        throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude returned invalid " + key);
+    }
+
+    private LocalDate dateField(Map<?, ?> map, String key) {
+        Object value = map.get(key);
+        if (value == null) return null;
+        if (value instanceof String text) {
+            if (text.isBlank()) return null;
+            try {
+                return LocalDate.parse(text.trim(), DateTimeFormatter.ISO_LOCAL_DATE);
+            } catch (Exception e) {
+                throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude returned invalid " + key, e);
+            }
+        }
+        throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude returned invalid " + key);
+    }
+
+    private List<LedgerLineItemExtraction> lineItemsField(Map<?, ?> map) {
+        Object value = map.get("lineItems");
+        if (value == null) return List.of();
+        if (!(value instanceof List<?> rows)) {
+            throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude returned invalid lineItems");
+        }
+        return rows.stream()
+                .map(row -> {
+                    if (!(row instanceof Map<?, ?> item)) {
+                        throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude returned invalid line item");
+                    }
+                    return new LedgerLineItemExtraction(
+                            stringField(item, "description"),
+                            decimalField(item, "quantity"),
+                            decimalField(item, "unitPrice")
+                    );
+                })
+                .toList();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     public LedgerExtraction parseLedgerText(String text) {

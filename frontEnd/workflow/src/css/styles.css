@@ -1944,6 +1944,9 @@ main,
 .admin-users-header .button_3 { display: flex; align-items: center; gap: 8px; }
 .admin-users-table { box-shadow: none; padding: 0; margin: 0; }
 .admin-role-select { padding: 4px 8px; border-radius: 6px; border: 1px solid var(--color-text-light); font-size: 0.85rem; }
+.admin-telegram-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.admin-muted-text { color: var(--color-text-light); font-size: 0.82rem; margin-top: 4px; }
+.admin-connect-code { font-size: 2rem; font-weight: 700; letter-spacing: 0; text-align: center; padding: 0.75rem; border: 1px solid var(--color-text-light); border-radius: 6px; margin-bottom: 1rem; }
 .admin-role-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; }
 .admin-role-admin, .admin-role-super-admin { background: #e1bee7; color: #7b1fa2; }
 .admin-role-gestor { background: #fff3e0; color: #e65100; }

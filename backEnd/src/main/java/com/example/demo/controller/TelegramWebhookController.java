@@ -1,20 +1,24 @@
 package com.example.demo.controller;
 
+import com.example.demo.config.TenantContext;
+import com.example.demo.dto.LedgerIngestionResult;
 import com.example.demo.model.Customer;
 import com.example.demo.model.Invoice;
+import com.example.demo.model.LedgerDirection;
 import com.example.demo.model.PaymentReminder;
 import com.example.demo.model.ReminderStatus;
 import com.example.demo.model.Status;
-import com.example.demo.model.WorkOrder;
-import com.example.demo.model.LedgerDirection;
+import com.example.demo.model.TelegramConnection;
 import com.example.demo.model.TelegramIngestionStatus;
+import com.example.demo.model.WorkOrder;
 import com.example.demo.repository.CustomerRepo;
 import com.example.demo.repository.InvoiceRepo;
 import com.example.demo.repository.PaymentReminderRepo;
 import com.example.demo.repository.WorkOrderRepo;
-import com.example.demo.service.TelegramService;
 import com.example.demo.service.LedgerIngestionService;
+import com.example.demo.service.TelegramConnectionService;
 import com.example.demo.service.TelegramIngestionWorker;
+import com.example.demo.service.TelegramService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -28,12 +32,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 
@@ -41,16 +44,16 @@ import java.util.concurrent.RejectedExecutionException;
 @RequestMapping("/api/telegram")
 public class TelegramWebhookController {
     private static final int OVERDUE_LIMIT = 15;
+    private static final String CONNECT_INSTRUCTIONS = "Para conectar este chat, genera un codigo en Admin > Telegram y envia /connect CODIGO desde un chat privado.";
+    private static final String PRIVATE_ONLY = "Telegram se conecta solo desde un chat privado con el bot.";
 
     private final CustomerRepo customerRepo;
     private final PaymentReminderRepo reminderRepo;
     private final InvoiceRepo invoiceRepo;
     private final WorkOrderRepo workOrderRepo;
     private final TelegramService telegramService;
-    private final Set<String> adminChatIds;
+    private final TelegramConnectionService connectionService;
     private final String webhookSecretToken;
-    private final Long adminTenantId;
-    private final Long ingestOwnerId;
     private final LedgerIngestionService ingestionService;
     private final TelegramIngestionWorker ingestionWorker;
     private final Executor ingestionExecutor;
@@ -60,25 +63,21 @@ public class TelegramWebhookController {
                                      InvoiceRepo invoiceRepo,
                                      WorkOrderRepo workOrderRepo,
                                      TelegramService telegramService,
+                                     TelegramConnectionService connectionService,
                                      LedgerIngestionService ingestionService,
                                      TelegramIngestionWorker ingestionWorker,
                                      @Qualifier("telegramIngestionExecutor") Executor ingestionExecutor,
-                                     @Value("${telegram.admin.chat-ids:}") String adminChatIds,
-                                     @Value("${telegram.webhook.secret-token:}") String webhookSecretToken,
-                                     @Value("${telegram.admin.tenant-id:}") String adminTenantId,
-                                     @Value("${telegram.admin.ingest-owner-id:}") String ingestOwnerId) {
+                                     @Value("${telegram.webhook.secret-token:}") String webhookSecretToken) {
         this.customerRepo = customerRepo;
         this.reminderRepo = reminderRepo;
         this.invoiceRepo = invoiceRepo;
         this.workOrderRepo = workOrderRepo;
         this.telegramService = telegramService;
+        this.connectionService = connectionService;
         this.ingestionService = ingestionService;
         this.ingestionWorker = ingestionWorker;
         this.ingestionExecutor = ingestionExecutor;
-        this.adminChatIds = parseAdminChatIds(adminChatIds);
         this.webhookSecretToken = webhookSecretToken == null ? "" : webhookSecretToken.trim();
-        this.adminTenantId = parseOptionalLong(adminTenantId);
-        this.ingestOwnerId = parseOptionalLong(ingestOwnerId);
     }
 
     @PostMapping("/webhook")
@@ -89,51 +88,91 @@ public class TelegramWebhookController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        Map<?, ?> callbackQuery = asMap(update.get("callback_query"));
-        if (callbackQuery != null) {
-            handleCallbackQuery(callbackQuery);
-            return ResponseEntity.ok().build();
-        }
+        try {
+            Map<?, ?> callbackQuery = asMap(update.get("callback_query"));
+            if (callbackQuery != null) {
+                handleCallbackQuery(callbackQuery);
+                return ResponseEntity.ok().build();
+            }
 
-        Map<?, ?> message = asMap(update.get("message"));
-        if (message == null) message = asMap(update.get("edited_message"));
-        if (message == null) return ResponseEntity.ok().build();
+            Map<?, ?> message = asMap(update.get("message"));
+            if (message == null) message = asMap(update.get("edited_message"));
+            if (message == null) return ResponseEntity.ok().build();
 
-        Map<?, ?> chat = asMap(message.get("chat"));
-        if (chat == null) return ResponseEntity.ok().build();
+            Map<?, ?> chat = asMap(message.get("chat"));
+            if (chat == null) return ResponseEntity.ok().build();
 
-        String chatId = String.valueOf(chat.get("id"));
-        String text = stringValue(message.get("text")).trim();
+            String chatId = stringValue(chat.get("id"));
+            String chatType = stringValue(chat.get("type"));
+            String chatTitle = chatTitle(chat);
+            String text = stringValue(message.get("text")).trim();
 
-        if (isPhotoMessage(message)) {
-            if (isAuthorizedAdmin(chatId)) {
-                handleMediaMessage(chatId, message, true);
+            if (isConnectCommand(text)) {
+                handleConnectCommand(chatId, chatType, chatTitle, text);
+                return ResponseEntity.ok().build();
+            }
+
+            if (!text.isBlank() && captureReminderResponse(chatId, text)) {
+                return ResponseEntity.ok().build();
+            }
+
+            Optional<TelegramConnection> connection = connectionService.resolveConnection(chatId);
+            if (connection.isEmpty()) {
+                handleUnknownChat(chatId, chatType, message, text);
+                return ResponseEntity.ok().build();
+            }
+
+            Long tenantId = connection.get().getTenant().getId();
+            TenantContext.set(tenantId);
+            try {
+                if (isPhotoMessage(message)) {
+                    handleMediaMessage(connection.get(), chatId, message, true);
+                    return ResponseEntity.ok().build();
+                }
+
+                if (message.get("document") instanceof Map<?, ?>) {
+                    handleMediaMessage(connection.get(), chatId, message, false);
+                    return ResponseEntity.ok().build();
+                }
+
+                if (isAdminCommand(text) || text.startsWith("/")) {
+                    handleAdminCommand(connection.get(), chatId, text);
+                    return ResponseEntity.ok().build();
+                }
+
+                if (!text.isBlank()) {
+                    submitTextIngestion(connection.get(), chatId, message, text);
+                }
+            } finally {
+                TenantContext.clear();
             }
             return ResponseEntity.ok().build();
-        }
-
-        if (message.get("document") instanceof Map<?, ?>) {
-            if (isAuthorizedAdmin(chatId)) {
-                handleMediaMessage(chatId, message, false);
-            }
+        } catch (Exception ignored) {
             return ResponseEntity.ok().build();
         }
-
-        if (isAdminCommand(text) || text.startsWith("/")) {
-            handleAdminCommand(chatId, text);
-            return ResponseEntity.ok().build();
-        }
-
-        if (captureReminderResponse(chatId, text)) {
-            return ResponseEntity.ok().build();
-        }
-        if (isAuthorizedAdmin(chatId) && !text.isBlank()) {
-            submitTextIngestion(chatId, message, text);
-        }
-        return ResponseEntity.ok().build();
     }
 
-    private void handleMediaMessage(String chatId, Map<?, ?> message, boolean photo) {
+    private void handleConnectCommand(String chatId, String chatType, String chatTitle, String text) {
+        try {
+            String code = text.trim().split("\\s+", 2).length == 2 ? text.trim().split("\\s+", 2)[1] : "";
+            connectionService.consumeConnectCode(code, chatId, chatType, chatTitle);
+            telegramService.sendMessage(chatId, "Telegram conectado a FinanzasFlow.");
+        } catch (Exception e) {
+            telegramService.sendMessage(chatId, safeError(e.getMessage(), CONNECT_INSTRUCTIONS));
+        }
+    }
+
+    private void handleUnknownChat(String chatId, String chatType, Map<?, ?> message, String text) {
+        if (!"private".equalsIgnoreCase(chatType) && (isPhotoMessage(message) || message.get("document") instanceof Map<?, ?> || text.startsWith("/connect"))) {
+            telegramService.sendMessage(chatId, PRIVATE_ONLY);
+            return;
+        }
+        if (isPhotoMessage(message) || message.get("document") instanceof Map<?, ?> || !text.isBlank()) {
+            telegramService.sendMessage(chatId, CONNECT_INSTRUCTIONS);
+        }
+    }
+
+    private void handleMediaMessage(TelegramConnection connection, String chatId, Map<?, ?> message, boolean photo) {
         Map<?, ?> media;
         String mediaType;
         if (photo) {
@@ -153,32 +192,41 @@ public class TelegramWebhookController {
         String caption = stringValue(message.get("caption"));
         if (fileId.isBlank() || messageId == null) return;
 
-        LedgerIngestionService.ClaimResult claim = ingestionService.claim(chatId, messageId, requireAdminTenantId());
+        Long tenantId = connection.getTenant().getId();
+        LedgerIngestionService.ClaimResult claim = ingestionService.claim(chatId, messageId, tenantId);
         if (claim.shouldProcess()) {
-            submitAsync(claim.ingestionId(), chatId,
+            submitAsync(claim.ingestionId(), chatId, tenantId,
                     () -> ingestionWorker.processMedia(claim.ingestionId(), chatId, fileId, mediaType, caption));
         } else if (claim.status() == TelegramIngestionStatus.COMPLETED) {
-            submitAsync(claim.ingestionId(), chatId,
-                    () -> ingestionWorker.echoCompleted(claim.ingestionId(), chatId, requireAdminTenantId()));
+            submitAsync(claim.ingestionId(), chatId, tenantId,
+                    () -> ingestionWorker.echoCompleted(claim.ingestionId(), chatId, tenantId));
         }
     }
 
-    private void submitTextIngestion(String chatId, Map<?, ?> message, String text) {
+    private void submitTextIngestion(TelegramConnection connection, String chatId, Map<?, ?> message, String text) {
         Long messageId = numberValue(message.get("message_id"));
         if (messageId == null) return;
-        LedgerIngestionService.ClaimResult claim = ingestionService.claim(chatId, messageId, requireAdminTenantId());
+        Long tenantId = connection.getTenant().getId();
+        LedgerIngestionService.ClaimResult claim = ingestionService.claim(chatId, messageId, tenantId);
         if (claim.shouldProcess()) {
-            submitAsync(claim.ingestionId(), chatId,
+            submitAsync(claim.ingestionId(), chatId, tenantId,
                     () -> ingestionWorker.processText(claim.ingestionId(), chatId, text));
         } else if (claim.status() == TelegramIngestionStatus.COMPLETED) {
-            submitAsync(claim.ingestionId(), chatId,
-                    () -> ingestionWorker.echoCompleted(claim.ingestionId(), chatId, requireAdminTenantId()));
+            submitAsync(claim.ingestionId(), chatId, tenantId,
+                    () -> ingestionWorker.echoCompleted(claim.ingestionId(), chatId, tenantId));
         }
     }
 
-    private void submitAsync(Long ingestionId, String chatId, Runnable work) {
+    private void submitAsync(Long ingestionId, String chatId, Long tenantId, Runnable work) {
         try {
-            ingestionExecutor.execute(work);
+            ingestionExecutor.execute(() -> {
+                TenantContext.set(tenantId);
+                try {
+                    work.run();
+                } finally {
+                    TenantContext.clear();
+                }
+            });
         } catch (RejectedExecutionException e) {
             ingestionService.markFailed(ingestionId, "Ingestion executor queue is full");
             telegramService.sendMessage(chatId, "Hay demasiadas cargas en proceso. Reenvia el mensaje en unos minutos.");
@@ -187,14 +235,9 @@ public class TelegramWebhookController {
 
     private void handleCallbackQuery(Map<?, ?> callback) {
         String callbackId = stringValue(callback.get("id"));
-        Map<?, ?> from = asMap(callback.get("from"));
         Map<?, ?> message = asMap(callback.get("message"));
         Map<?, ?> chat = message == null ? null : asMap(message.get("chat"));
-        String senderId = from == null ? "" : stringValue(from.get("id"));
         String chatId = chat == null ? "" : stringValue(chat.get("id"));
-        if (!isAuthorizedAdmin(chatId) && !isAuthorizedAdmin(senderId)) {
-            return;
-        }
 
         String[] parts = stringValue(callback.get("data")).split(":");
         if (parts.length != 3 || !"ledger".equals(parts[0])) return;
@@ -206,32 +249,37 @@ public class TelegramWebhookController {
             return;
         }
         if (ingestionId == null) return;
-        if (ingestOwnerId == null) {
-            telegramService.sendMessage(chatId, "No pude guardar el registro: TELEGRAM_ADMIN_INGEST_OWNER_ID no esta configurado.");
-            return;
-        }
-        if (!callbackId.isBlank()) {
-            try {
-                telegramService.answerCallbackQuery(callbackId);
-            } catch (Exception ignored) {
+
+        connectionService.resolveConnection(chatId).ifPresentOrElse(connection -> {
+            if (!callbackId.isBlank()) {
+                try {
+                    telegramService.answerCallbackQuery(callbackId);
+                } catch (Exception ignored) {
+                }
             }
-        }
-        try {
-            var result = ingestionService.finalizeDirection(
-                    ingestionId, chatId, requireAdminTenantId(), ingestOwnerId, direction);
-            telegramService.sendMessage(chatId, ingestionWorker.completedText(result));
-        } catch (Exception e) {
-            telegramService.sendMessage(chatId, "No pude guardar el registro. Revisa el documento o intenta nuevamente.");
-        }
+            Long tenantId = connection.getTenant().getId();
+            Long ownerId = connection.getDefaultOwner() == null ? null : connection.getDefaultOwner().getId();
+            if (ownerId == null) {
+                telegramService.sendMessage(chatId, "No pude guardar el registro: falta usuario responsable para este chat.");
+                return;
+            }
+            TenantContext.set(tenantId);
+            try {
+                LedgerIngestionResult result = ingestionService.finalizeDirection(
+                        ingestionId, chatId, tenantId, ownerId, direction);
+                telegramService.sendMessage(chatId, ingestionWorker.completedText(result));
+            } catch (Exception e) {
+                ingestionService.markFailed(ingestionId, e.getMessage());
+                telegramService.sendMessage(chatId, "No pude guardar el registro. Revisa el documento o intenta nuevamente.");
+            } finally {
+                TenantContext.clear();
+            }
+        }, () -> telegramService.sendMessage(chatId, CONNECT_INSTRUCTIONS));
     }
 
-    private void handleAdminCommand(String chatId, String text) {
-        if (!isAuthorizedAdmin(chatId)) {
-            telegramService.sendMessage(chatId, "No autorizado para comandos admin.");
-            return;
-        }
-
+    private void handleAdminCommand(TelegramConnection connection, String chatId, String text) {
         String normalized = normalizeCommand(text);
+        Long tenantId = connection.getTenant().getId();
         try {
             if (normalized.equals("/start") || normalized.equals("/help") || normalized.equals("help") || normalized.equals("ayuda")) {
                 telegramService.sendMessage(chatId, helpText());
@@ -241,18 +289,18 @@ public class TelegramWebhookController {
             if (normalized.equals("/overdue") || normalized.equals("overdue")
                     || normalized.equals("/vencidas") || normalized.equals("vencidas")
                     || normalized.equals("atrasadas")) {
-                telegramService.sendMessage(chatId, overdueSummary());
+                telegramService.sendMessage(chatId, overdueSummary(tenantId));
                 return;
             }
 
             if (normalized.startsWith("/status ") || normalized.startsWith("status ")) {
-                telegramService.sendMessage(chatId, updateStatus(text));
+                telegramService.sendMessage(chatId, updateStatus(text, tenantId));
                 return;
             }
 
             if (normalized.startsWith("/note ") || normalized.startsWith("note ")
                     || normalized.startsWith("/nota ") || normalized.startsWith("nota ")) {
-                telegramService.sendMessage(chatId, appendNote(text));
+                telegramService.sendMessage(chatId, appendNote(text, tenantId));
                 return;
             }
 
@@ -262,8 +310,7 @@ public class TelegramWebhookController {
         }
     }
 
-    private String overdueSummary() {
-        Long tenantId = requireAdminTenantId();
+    private String overdueSummary(Long tenantId) {
         List<Invoice> overdue = invoiceRepo.findOverdueOpenInvoicesByTenant(LocalDate.now(), tenantId);
         if (overdue.isEmpty()) {
             return "No hay facturas vencidas abiertas.";
@@ -300,7 +347,7 @@ public class TelegramWebhookController {
         return sb.toString();
     }
 
-    private String updateStatus(String text) {
+    private String updateStatus(String text, Long tenantId) {
         String[] parts = text.trim().split("\\s+", 3);
         if (parts.length < 3) {
             return "Formato: /status <invoiceId> <EN_GESTION|CONTACTADO|PROMETIO_PAGO|EN_DISPUTA|INCOBRABLE|CERRADO>";
@@ -308,7 +355,7 @@ public class TelegramWebhookController {
 
         Long invoiceId = parseId(parts[1]);
         Status status = parseStatus(parts[2]);
-        invoiceRepo.findByIdAndTenant_Id(invoiceId, requireAdminTenantId())
+        invoiceRepo.findByIdAndTenant_Id(invoiceId, tenantId)
                 .orElseThrow(() -> new RuntimeException("No encontre factura #" + invoiceId));
         WorkOrder workOrder = workOrderRepo.findByInvoice_Id(invoiceId)
                 .orElseThrow(() -> new RuntimeException("No encontre gestion para factura #" + invoiceId));
@@ -320,14 +367,14 @@ public class TelegramWebhookController {
         return "Factura #" + invoiceId + " actualizada a " + status.name() + ".";
     }
 
-    private String appendNote(String text) {
+    private String appendNote(String text, Long tenantId) {
         String[] parts = text.trim().split("\\s+", 3);
         if (parts.length < 3 || parts[2].isBlank()) {
             return "Formato: /note <invoiceId> <nota>";
         }
 
         Long invoiceId = parseId(parts[1]);
-        Invoice invoice = invoiceRepo.findByIdAndTenant_Id(invoiceId, requireAdminTenantId())
+        Invoice invoice = invoiceRepo.findByIdAndTenant_Id(invoiceId, tenantId)
                 .orElseThrow(() -> new RuntimeException("No encontre factura #" + invoiceId));
 
         String existing = invoice.getNotas() == null || invoice.getNotas().isBlank() ? "" : invoice.getNotas().trim();
@@ -350,7 +397,7 @@ public class TelegramWebhookController {
                 }).orElse(false);
     }
 
-    private java.util.Optional<PaymentReminder> latestReminder(Customer customer) {
+    private Optional<PaymentReminder> latestReminder(Customer customer) {
         return reminderRepo.findTopByCustomer_IdOrderBySentAtDesc(customer.getId());
     }
 
@@ -374,19 +421,12 @@ public class TelegramWebhookController {
                 || normalized.startsWith("nota ");
     }
 
-    private boolean isAuthorizedAdmin(String chatId) {
-        return !adminChatIds.isEmpty() && adminChatIds.contains(chatId);
+    private boolean isConnectCommand(String text) {
+        return normalizeCommand(text).startsWith("/connect");
     }
 
     private boolean isValidWebhookSecret(String secretToken) {
         return !webhookSecretToken.isBlank() && webhookSecretToken.equals(secretToken);
-    }
-
-    private Long requireAdminTenantId() {
-        if (adminTenantId == null) {
-            throw new RuntimeException("TELEGRAM_ADMIN_TENANT_ID no configurado");
-        }
-        return adminTenantId;
     }
 
     private boolean isPhotoMessage(Map<?, ?> message) {
@@ -430,14 +470,6 @@ public class TelegramWebhookController {
                 """;
     }
 
-    private Set<String> parseAdminChatIds(String raw) {
-        if (raw == null || raw.isBlank()) return Set.of();
-        return Arrays.stream(raw.split(","))
-                .map(String::trim)
-                .filter(value -> !value.isBlank())
-                .collect(Collectors.toSet());
-    }
-
     private Long parseOptionalLong(String raw) {
         if (raw == null || raw.isBlank()) return null;
         try {
@@ -456,7 +488,20 @@ public class TelegramWebhookController {
         return value == null ? "" : String.valueOf(value);
     }
 
-    @SuppressWarnings("unchecked")
+    private String chatTitle(Map<?, ?> chat) {
+        String title = stringValue(chat.get("title"));
+        if (!title.isBlank()) return title;
+        String firstName = stringValue(chat.get("first_name"));
+        String lastName = stringValue(chat.get("last_name"));
+        return (firstName + " " + lastName).trim();
+    }
+
+    private String safeError(String message, String fallback) {
+        if (message == null || message.isBlank()) return fallback;
+        String safe = message.replaceAll("[\\r\\n]+", " ").trim();
+        return safe.length() > 300 ? safe.substring(0, 300) : safe;
+    }
+
     private Map<?, ?> asMap(Object value) {
         return value instanceof Map<?, ?> map ? map : null;
     }

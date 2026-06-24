@@ -11,6 +11,8 @@ import {
 	FaCheck,
 	FaTimes,
 	FaKey,
+	FaTelegramPlane,
+	FaCopy,
 } from 'react-icons/fa';
 import {
 	BarChart,
@@ -47,6 +49,9 @@ function AdminPage() {
 	const [editingRole, setEditingRole] = useState('');
 	const [passwordUser, setPasswordUser] = useState(null);
 	const [newPassword, setNewPassword] = useState('');
+	const [telegramConnections, setTelegramConnections] = useState([]);
+	const [telegramOwnerId, setTelegramOwnerId] = useState('');
+	const [connectCode, setConnectCode] = useState(null);
 	const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
 	const canChangeSuperadminPassword = currentUser?.role === 'SUPER_ADMIN';
 
@@ -72,11 +77,18 @@ function AdminPage() {
 			// Si tu endpoint es diferente, cambialo aqui.
 			// Generalmente es /api/users o /api/admin/users
 			const usersRes = await axios.get(`${BASE_URL}/api/admin/users`, config);
-			setUsers(usersRes.data);
+			const fetchedUsers = usersRes.data;
+			setUsers(fetchedUsers);
+			if (!telegramOwnerId && fetchedUsers.length > 0) {
+				setTelegramOwnerId(String(fetchedUsers[0].id));
+			}
+
+			const telegramRes = await axios.get(`${BASE_URL}/api/admin/telegram/connections`, config);
+			setTelegramConnections(telegramRes.data);
 		} catch (err) {
 			console.error('Error fetching admin data:', err);
 		}
-	}, []);
+	}, [telegramOwnerId]);
 
 	useEffect(() => {
 		fetchData();
@@ -168,6 +180,58 @@ function AdminPage() {
 		} catch {
 			setMsg({text: 'No se pudo actualizar la contraseña', type: 'red'});
 		}
+	};
+
+	const handleGenerateTelegramCode = async () => {
+		if (!telegramOwnerId) {
+			setMsg({text: 'Elegi un responsable para Telegram', type: 'red'});
+			return;
+		}
+		try {
+			const token = localStorage.getItem('token');
+			const res = await axios.post(
+				`${BASE_URL}/api/admin/telegram/connect-codes`,
+				{defaultOwnerId: Number(telegramOwnerId)},
+				{headers: {Authorization: `Bearer ${token}`}},
+			);
+			setConnectCode(res.data);
+		} catch {
+			setMsg({text: 'No se pudo generar el codigo de Telegram', type: 'red'});
+		}
+	};
+
+	const handleDisableTelegramConnection = async (id) => {
+		if (!window.confirm('Deshabilitar esta conexion de Telegram?')) return;
+		try {
+			const token = localStorage.getItem('token');
+			await axios.delete(`${BASE_URL}/api/admin/telegram/connections/${id}`, {
+				headers: {Authorization: `Bearer ${token}`},
+			});
+			fetchData();
+		} catch {
+			setMsg({text: 'No se pudo deshabilitar la conexion', type: 'red'});
+		}
+	};
+
+	const handleUpdateTelegramOwner = async (connectionId, ownerId) => {
+		try {
+			const token = localStorage.getItem('token');
+			await axios.put(
+				`${BASE_URL}/api/admin/telegram/connections/${connectionId}/owner`,
+				{defaultOwnerId: Number(ownerId)},
+				{headers: {Authorization: `Bearer ${token}`}},
+			);
+			setMsg({text: 'Responsable de Telegram actualizado', type: 'green'});
+			fetchData();
+			setTimeout(() => setMsg({text: '', type: ''}), 3000);
+		} catch {
+			setMsg({text: 'No se pudo actualizar el responsable', type: 'red'});
+		}
+	};
+
+	const copyConnectCode = () => {
+		if (!connectCode?.code || !navigator.clipboard) return;
+		navigator.clipboard.writeText(`/connect ${connectCode.code}`);
 	};
 
 	const dismissDigest = () => {
@@ -268,7 +332,92 @@ function AdminPage() {
 					</div>
 				</div>
 
-				{/* SECTION B: USER MANAGEMENT */}
+				{/* SECTION B: TELEGRAM */}
+				<div className='costs-wrapper admin-section-panel'>
+					<div className='admin-users-header'>
+						<h2>Telegram</h2>
+						<div className='admin-telegram-actions'>
+							<select
+								value={telegramOwnerId}
+								onChange={(e) => setTelegramOwnerId(e.target.value)}
+								className='admin-role-select'
+							>
+								{users.map((u) => (
+									<option key={u.id} value={u.id}>
+										{u.username}
+									</option>
+								))}
+							</select>
+							<button
+								className='button_3'
+								onClick={handleGenerateTelegramCode}
+							>
+								<FaTelegramPlane /> Generar codigo
+							</button>
+						</div>
+					</div>
+
+					<div className='table-wrapper admin-users-table'>
+						<table className='orders-table'>
+							<thead>
+								<tr>
+									<th>Chat</th>
+									<th>Tipo</th>
+									<th>Responsable</th>
+									<th>Conectado</th>
+									<th className='text-center'>Acciones</th>
+								</tr>
+							</thead>
+							<tbody>
+								{telegramConnections.length > 0 ? (
+									telegramConnections.map((conn) => (
+										<tr key={conn.id}>
+											<td>
+												<strong>{conn.chatTitle || conn.chatId}</strong>
+												<div className='admin-muted-text'>{conn.chatId}</div>
+											</td>
+											<td>{conn.chatType || 'private'}</td>
+											<td>
+												<select
+													value={conn.defaultOwnerId || ''}
+													onChange={(e) => handleUpdateTelegramOwner(conn.id, e.target.value)}
+													className='admin-role-select'
+												>
+													{users.map((u) => (
+														<option key={u.id} value={u.id}>
+															{u.username}
+														</option>
+													))}
+												</select>
+											</td>
+											<td>{conn.createdAt ? new Date(conn.createdAt).toLocaleString() : '-'}</td>
+											<td className='text-center admin-user-actions'>
+												<button
+													className='btn-delete'
+													onClick={() => handleDisableTelegramConnection(conn.id)}
+													title='Deshabilitar'
+												>
+													<FaTrashAlt />
+												</button>
+											</td>
+										</tr>
+									))
+								) : (
+									<tr>
+										<td
+											colSpan='5'
+											className='text-center admin-empty-cell'
+										>
+											No hay chats conectados.
+										</td>
+									</tr>
+								)}
+							</tbody>
+						</table>
+					</div>
+				</div>
+
+				{/* SECTION C: USER MANAGEMENT */}
 				<div className='costs-wrapper admin-section-panel'>
 					<div
 						className='admin-users-header'
@@ -443,6 +592,32 @@ function AdminPage() {
 								Actualizar Contraseña
 							</button>
 						</form>
+					</div>
+				</div>
+			)}
+
+			{/* MODAL CODIGO TELEGRAM */}
+			{connectCode && (
+				<div
+					className='modal-overlay'
+					onClick={() => setConnectCode(null)}
+				>
+					<div
+						className='modal-content'
+						onClick={(e) => e.stopPropagation()}
+					>
+						<h2 className='admin-modal-title'>Codigo Telegram</h2>
+						<div className='admin-connect-code'>{connectCode.code}</div>
+						<p className='admin-muted-text'>
+							Envia /connect {connectCode.code} al bot desde un chat privado.
+						</p>
+						<button
+							type='button'
+							className='button_3 margin-5 admin-modal-submit'
+							onClick={copyConnectCode}
+						>
+							<FaCopy /> Copiar comando
+						</button>
 					</div>
 				</div>
 			)}

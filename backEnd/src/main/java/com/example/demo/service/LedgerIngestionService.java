@@ -23,6 +23,14 @@ import java.util.Optional;
 @Service
 public class LedgerIngestionService {
     public record ClaimResult(Long ingestionId, boolean shouldProcess, TelegramIngestionStatus status) {}
+    private static final BigDecimal MAX_MONEY = new BigDecimal("9999999999.99");
+    private static final int MAX_TITLE_LENGTH = 255;
+    private static final int MAX_NAME_LENGTH = 255;
+    private static final int MAX_CUIT_LENGTH = 30;
+    private static final int MAX_EMAIL_LENGTH = 255;
+    private static final int MAX_PHONE_LENGTH = 50;
+    private static final int MAX_DESCRIPTION_LENGTH = 2000;
+    private static final int MAX_LINE_DESCRIPTION_LENGTH = 255;
 
     private final TelegramLedgerIngestionRepo ingestionRepo;
     private final TenantRepo tenantRepo;
@@ -95,11 +103,11 @@ public class LedgerIngestionService {
 
     @Transactional
     public void markPending(Long ingestionId, LedgerExtraction extraction) {
-        validateExtraction(extraction);
+        LedgerExtraction normalized = normalizeExtraction(extraction);
         TelegramLedgerIngestion ingestion = ingestionRepo.findLockedById(ingestionId)
                 .orElseThrow(() -> new IllegalArgumentException("Ingestion not found"));
         if (ingestion.getStatus() != TelegramIngestionStatus.PROCESSING) return;
-        ingestion.setExtractionJson(objectMapper.convertValue(extraction, Map.class));
+        ingestion.setExtractionJson(objectMapper.convertValue(normalized, Map.class));
         ingestion.setStatus(TelegramIngestionStatus.PENDING_DIRECTION);
         ingestion.setFailureReason(null);
         ingestion.setUpdatedAt(LocalDateTime.now());
@@ -134,15 +142,13 @@ public class LedgerIngestionService {
         if (!ingestion.getChatId().equals(chatId) || !ingestion.getTenant().getId().equals(tenantId)) {
             throw new SecurityException("Ingestion does not belong to this chat and tenant");
         }
-        LedgerExtraction extraction = readExtraction(ingestion);
+        LedgerExtraction extraction = normalizeExtraction(readExtraction(ingestion));
         if (ingestion.getStatus() == TelegramIngestionStatus.COMPLETED) {
             return resultFrom(ingestion, extraction, true);
         }
         if (ingestion.getStatus() != TelegramIngestionStatus.PENDING_DIRECTION) {
             throw new IllegalStateException("Ingestion is not pending direction");
         }
-        validateExtraction(extraction);
-
         LedgerRecordType recordType;
         Long recordId;
         if (direction == LedgerDirection.COBRO) {
@@ -177,28 +183,64 @@ public class LedgerIngestionService {
     }
 
     public void validateExtraction(LedgerExtraction extraction) {
+        normalizeExtraction(extraction);
+    }
+
+    public LedgerExtraction normalizeExtraction(LedgerExtraction extraction) {
         if (extraction == null || extraction.amount() == null || extraction.amount().signum() <= 0) {
             throw new IllegalArgumentException("El total debe ser positivo");
         }
-        if (isBlank(extraction.counterpartyName()) && isBlank(extraction.cuitDni()) && isBlank(extraction.email())) {
+        BigDecimal amount = normalizePositiveMoney(extraction.amount(), "El total");
+        String title = trimToLength(extraction.titulo(), MAX_TITLE_LENGTH);
+        String counterpartyName = trimToLength(extraction.counterpartyName(), MAX_NAME_LENGTH);
+        String cuitDni = trimToLength(extraction.cuitDni(), MAX_CUIT_LENGTH);
+        String email = trimToLength(extraction.email(), MAX_EMAIL_LENGTH);
+        String phone = trimToLength(extraction.phone(), MAX_PHONE_LENGTH);
+        String description = trimToLength(extraction.description(), MAX_DESCRIPTION_LENGTH);
+        if (isBlank(counterpartyName) && isBlank(cuitDni) && isBlank(email)) {
             throw new IllegalArgumentException("Falta identificar al cliente o proveedor");
         }
-        List<LedgerLineItemExtraction> rows = extraction.lineItems();
-        if (rows == null || rows.isEmpty()) return;
+        List<LedgerLineItemExtraction> rows = normalizeLineItems(extraction.lineItems());
         BigDecimal sum = BigDecimal.ZERO;
-        boolean hasComparableRows = false;
         for (LedgerLineItemExtraction row : rows) {
-            if (row == null || row.quantity() == null || row.unitPrice() == null) continue;
-            if (row.quantity().signum() < 0 || row.unitPrice().signum() < 0) {
-                throw new IllegalArgumentException("Los renglones no pueden tener valores negativos");
-            }
             sum = sum.add(row.quantity().multiply(row.unitPrice()));
-            hasComparableRows = true;
         }
-        if (hasComparableRows && sum.setScale(2, RoundingMode.HALF_UP)
-                .compareTo(extraction.amount().setScale(2, RoundingMode.HALF_UP)) != 0) {
+        if (!rows.isEmpty() && sum.setScale(2, RoundingMode.HALF_UP).compareTo(amount) != 0) {
             throw new IllegalArgumentException("El total no coincide con los renglones extraidos");
         }
+        return new LedgerExtraction(
+                title, counterpartyName, cuitDni, email, phone, amount,
+                extraction.issueDate(), extraction.dueDate(), description, rows);
+    }
+
+    private List<LedgerLineItemExtraction> normalizeLineItems(List<LedgerLineItemExtraction> rows) {
+        if (rows == null || rows.isEmpty()) return List.of();
+        return rows.stream()
+                .filter(row -> row != null && !isBlank(row.description()))
+                .map(row -> new LedgerLineItemExtraction(
+                        trimToLength(row.description(), MAX_LINE_DESCRIPTION_LENGTH),
+                        normalizePositiveQuantity(row.quantity()),
+                        normalizePositiveMoney(row.unitPrice(), "El precio unitario")
+                ))
+                .toList();
+    }
+
+    private BigDecimal normalizePositiveMoney(BigDecimal value, String label) {
+        if (value == null || value.signum() <= 0) {
+            throw new IllegalArgumentException(label + " debe ser positivo");
+        }
+        BigDecimal normalized = value.setScale(2, RoundingMode.HALF_UP);
+        if (normalized.compareTo(MAX_MONEY) > 0) {
+            throw new IllegalArgumentException(label + " excede el maximo permitido");
+        }
+        return normalized;
+    }
+
+    private BigDecimal normalizePositiveQuantity(BigDecimal value) {
+        if (value == null || value.signum() <= 0) {
+            throw new IllegalArgumentException("La cantidad debe ser positiva");
+        }
+        return value.setScale(3, RoundingMode.HALF_UP);
     }
 
     private Customer resolveOrCreateCustomer(LedgerExtraction extraction, Long tenantId) {
@@ -283,6 +325,12 @@ public class LedgerIngestionService {
 
     private String trimToNull(String value) {
         return isBlank(value) ? null : value.trim();
+    }
+
+    private String trimToLength(String value, int maxLength) {
+        if (isBlank(value)) return null;
+        String trimmed = value.trim();
+        return trimmed.length() <= maxLength ? trimmed : trimmed.substring(0, maxLength);
     }
 
     private boolean isBlank(String value) {
