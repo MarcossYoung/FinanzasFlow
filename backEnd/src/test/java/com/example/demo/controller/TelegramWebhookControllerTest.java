@@ -1,6 +1,9 @@
 package com.example.demo.controller;
 
 import com.example.demo.model.TelegramIngestionStatus;
+import com.example.demo.model.LedgerDirection;
+import com.example.demo.model.LedgerRecordType;
+import com.example.demo.dto.LedgerIngestionResult;
 import com.example.demo.repository.*;
 import com.example.demo.service.LedgerIngestionService;
 import com.example.demo.service.TelegramIngestionWorker;
@@ -8,6 +11,8 @@ import com.example.demo.service.TelegramService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -52,6 +57,28 @@ class TelegramWebhookControllerTest {
 
         assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
         verifyNoInteractions(ingestionService, worker, telegramService);
+    }
+
+    @Test
+    void callbackFromAuthorizedChatAllowsDifferentSenderId() {
+        LedgerIngestionResult result = new LedgerIngestionResult(
+                7L, LedgerDirection.COBRO, LedgerRecordType.INVOICE, 11L,
+                new BigDecimal("123.45"), "ACME", LocalDate.of(2026, 6, 24), false);
+        when(ingestionService.finalizeDirection(7L, "42", 1L, 2L, LedgerDirection.COBRO))
+                .thenReturn(result);
+        when(worker.completedText(result)).thenReturn("Guardado como invoice: #11");
+        TelegramWebhookController controller = controller("42");
+        Map<String, Object> update = Map.of("callback_query", Map.of(
+                "id", "callback-1",
+                "from", Map.of("id", 99),
+                "message", Map.of("chat", Map.of("id", 42)),
+                "data", "ledger:7:COBRO"
+        ));
+
+        assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
+        verify(telegramService).answerCallbackQuery("callback-1");
+        verify(ingestionService).finalizeDirection(7L, "42", 1L, 2L, LedgerDirection.COBRO);
+        verify(telegramService).sendMessage("42", "Guardado como invoice: #11");
     }
 
     private TelegramWebhookController controller(String chats) {

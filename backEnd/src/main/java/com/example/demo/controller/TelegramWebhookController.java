@@ -192,7 +192,9 @@ public class TelegramWebhookController {
         Map<?, ?> chat = message == null ? null : asMap(message.get("chat"));
         String senderId = from == null ? "" : stringValue(from.get("id"));
         String chatId = chat == null ? "" : stringValue(chat.get("id"));
-        if (!isAuthorizedAdmin(senderId) || !isAuthorizedAdmin(chatId)) return;
+        if (!isAuthorizedAdmin(chatId) && !isAuthorizedAdmin(senderId)) {
+            return;
+        }
 
         String[] parts = stringValue(callback.get("data")).split(":");
         if (parts.length != 3 || !"ledger".equals(parts[0])) return;
@@ -203,7 +205,11 @@ public class TelegramWebhookController {
         } catch (Exception e) {
             return;
         }
-        if (ingestionId == null || ingestOwnerId == null) return;
+        if (ingestionId == null) return;
+        if (ingestOwnerId == null) {
+            telegramService.sendMessage(chatId, "No pude guardar el registro: TELEGRAM_ADMIN_INGEST_OWNER_ID no esta configurado.");
+            return;
+        }
         if (!callbackId.isBlank()) {
             try {
                 telegramService.answerCallbackQuery(callbackId);
