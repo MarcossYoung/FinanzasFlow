@@ -2,6 +2,7 @@ package com.example.demo.service;
 
 import com.example.demo.dto.LedgerExtraction;
 import com.example.demo.dto.LedgerIngestionResult;
+import com.example.demo.service.ingestion.PendingLedgerStore;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -14,7 +15,8 @@ class TelegramIngestionWorkerTest {
     private final AiService aiService = mock(AiService.class);
     private final TelegramService telegramService = mock(TelegramService.class);
     private final LedgerIngestionService ingestionService = mock(LedgerIngestionService.class);
-    private final TelegramIngestionWorker worker = new TelegramIngestionWorker(aiService, telegramService, ingestionService);
+    private final PendingLedgerStore store = mock(PendingLedgerStore.class);
+    private final TelegramIngestionWorker worker = new TelegramIngestionWorker(aiService, telegramService, ingestionService, store);
 
     @Test
     void invalidExtractionMarksFailedAndDoesNotSendButtons() {
@@ -22,15 +24,15 @@ class TelegramIngestionWorkerTest {
                 null, null, null, null, List.of());
         when(aiService.parseLedgerText("bad")).thenReturn(invalid);
         doThrow(new IllegalArgumentException("El total debe ser positivo"))
-                .when(ingestionService).markPending(7L, invalid);
+                .when(ingestionService).normalizeExtraction(invalid);
 
         worker.processText(7L, "42", "bad");
 
-        verify(ingestionService).markFailed(7L, "El total debe ser positivo");
+        verify(store).remove(7L);
         verify(telegramService).sendMessage("42",
                 "No pude leer datos suficientes. Envia una imagen mas clara, un PDF o texto completo.");
         verify(telegramService, never()).sendMessageWithButtons(anyString(), anyString(), anyList());
-        verify(ingestionService, never()).recordCallbackMessage(anyLong(), anyLong());
+        verify(store, never()).attachExtraction(anyLong(), any());
     }
 
     @Test
@@ -50,8 +52,7 @@ class TelegramIngestionWorkerTest {
 
         worker.processText(7L, "42", "factura");
 
-        verify(ingestionService).markPending(7L, extraction);
+        verify(store).attachExtraction(7L, extraction);
         verify(telegramService).sendMessageWithButtons(eq("42"), contains("Detectado"), anyList());
-        verify(ingestionService).recordCallbackMessage(7L, 99L);
     }
 }

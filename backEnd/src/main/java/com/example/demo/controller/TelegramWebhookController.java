@@ -9,7 +9,6 @@ import com.example.demo.model.PaymentReminder;
 import com.example.demo.model.ReminderStatus;
 import com.example.demo.model.Status;
 import com.example.demo.model.TelegramConnection;
-import com.example.demo.model.TelegramIngestionStatus;
 import com.example.demo.model.WorkOrder;
 import com.example.demo.repository.CustomerRepo;
 import com.example.demo.repository.InvoiceRepo;
@@ -19,6 +18,8 @@ import com.example.demo.service.LedgerIngestionService;
 import com.example.demo.service.TelegramConnectionService;
 import com.example.demo.service.TelegramIngestionWorker;
 import com.example.demo.service.TelegramService;
+import com.example.demo.service.ingestion.PendingLedger;
+import com.example.demo.service.ingestion.PendingLedgerStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -60,6 +61,7 @@ public class TelegramWebhookController {
     private final String webhookSecretToken;
     private final LedgerIngestionService ingestionService;
     private final TelegramIngestionWorker ingestionWorker;
+    private final PendingLedgerStore pendingLedgerStore;
     private final Executor ingestionExecutor;
 
     public TelegramWebhookController(CustomerRepo customerRepo,
@@ -70,6 +72,7 @@ public class TelegramWebhookController {
                                      TelegramConnectionService connectionService,
                                      LedgerIngestionService ingestionService,
                                      TelegramIngestionWorker ingestionWorker,
+                                     PendingLedgerStore pendingLedgerStore,
                                      @Qualifier("telegramIngestionExecutor") Executor ingestionExecutor,
                                      @Value("${telegram.webhook.secret-token:}") String webhookSecretToken) {
         this.customerRepo = customerRepo;
@@ -80,6 +83,7 @@ public class TelegramWebhookController {
         this.connectionService = connectionService;
         this.ingestionService = ingestionService;
         this.ingestionWorker = ingestionWorker;
+        this.pendingLedgerStore = pendingLedgerStore;
         this.ingestionExecutor = ingestionExecutor;
         this.webhookSecretToken = webhookSecretToken == null ? "" : webhookSecretToken.trim();
     }
@@ -198,31 +202,20 @@ public class TelegramWebhookController {
         if (fileId.isBlank() || messageId == null) return;
 
         Long tenantId = connection.getTenant().getId();
-        LedgerIngestionService.ClaimResult claim = ingestionService.claim(chatId, messageId, tenantId);
-        if (claim.shouldProcess()) {
-            submitAsync(claim.ingestionId(), chatId, tenantId,
-                    () -> ingestionWorker.processMedia(claim.ingestionId(), chatId, fileId, mediaType, caption));
-        } else if (claim.status() == TelegramIngestionStatus.COMPLETED) {
-            submitAsync(claim.ingestionId(), chatId, tenantId,
-                    () -> ingestionWorker.echoCompleted(claim.ingestionId(), chatId, tenantId));
-        }
+        pendingLedgerStore.claim(chatId, messageId, tenantId).ifPresent(token ->
+                submitAsync(token, chatId, tenantId,
+                        () -> ingestionWorker.processMedia(token, chatId, fileId, mediaType, caption)));
     }
 
     private void submitTextIngestion(TelegramConnection connection, String chatId, Map<?, ?> message, String text) {
         Long messageId = numberValue(message.get("message_id"));
         if (messageId == null) return;
         Long tenantId = connection.getTenant().getId();
-        LedgerIngestionService.ClaimResult claim = ingestionService.claim(chatId, messageId, tenantId);
-        if (claim.shouldProcess()) {
-            submitAsync(claim.ingestionId(), chatId, tenantId,
-                    () -> ingestionWorker.processText(claim.ingestionId(), chatId, text));
-        } else if (claim.status() == TelegramIngestionStatus.COMPLETED) {
-            submitAsync(claim.ingestionId(), chatId, tenantId,
-                    () -> ingestionWorker.echoCompleted(claim.ingestionId(), chatId, tenantId));
-        }
+        pendingLedgerStore.claim(chatId, messageId, tenantId).ifPresent(token ->
+                submitAsync(token, chatId, tenantId, () -> ingestionWorker.processText(token, chatId, text)));
     }
 
-    private void submitAsync(Long ingestionId, String chatId, Long tenantId, Runnable work) {
+    private void submitAsync(long token, String chatId, Long tenantId, Runnable work) {
         try {
             ingestionExecutor.execute(() -> {
                 TenantContext.set(tenantId);
@@ -233,7 +226,7 @@ public class TelegramWebhookController {
                 }
             });
         } catch (RejectedExecutionException e) {
-            ingestionService.markFailed(ingestionId, "Ingestion executor queue is full");
+            pendingLedgerStore.remove(token);
             telegramService.sendMessage(chatId, "Hay demasiadas cargas en proceso. Reenvia el mensaje en unos minutos.");
         }
     }
@@ -243,28 +236,31 @@ public class TelegramWebhookController {
         Map<?, ?> message = asMap(callback.get("message"));
         Map<?, ?> chat = message == null ? null : asMap(message.get("chat"));
         String chatId = chat == null ? "" : stringValue(chat.get("id"));
-        Long callbackMessageId = message == null ? null : numberValue(message.get("message_id"));
         answerCallbackQuery(callbackId, chatId);
 
         String[] parts = stringValue(callback.get("data")).split(":");
         if (parts.length != 3 || !"ledger".equals(parts[0])) return;
-        Long ingestionId = parseOptionalLong(parts[1]);
+        Long token = parseOptionalLong(parts[1]);
         LedgerDirection direction;
         try {
             direction = LedgerDirection.valueOf(parts[2]);
         } catch (Exception e) {
             return;
         }
-        if (ingestionId == null) return;
+        if (token == null) return;
 
-        Optional<TelegramConnection> resolvedConnection;
-        try {
-            resolvedConnection = connectionService.resolveConnection(chatId);
-        } catch (Exception e) {
-            log.error("Failed to resolve Telegram callback connection for chatId={}, ingestionId={}",
-                    chatId, ingestionId, e);
-            throw e;
+        Optional<PendingLedger> pending = pendingLedgerStore.get(token);
+        if (pending.isEmpty()) {
+            telegramService.sendMessage(chatId, "Esa carga expiro o ya fue procesada. Reenvia el documento para guardarlo.");
+            return;
         }
+        if (!pending.get().chatId().equals(chatId)) {
+            log.warn("Telegram callback token={} rejected for chatId={}", token, chatId);
+            telegramService.sendMessage(chatId, "Esa carga expiro o ya fue procesada. Reenvia el documento para guardarlo.");
+            return;
+        }
+
+        Optional<TelegramConnection> resolvedConnection = connectionService.resolveConnection(chatId);
 
         resolvedConnection.ifPresentOrElse(connection -> {
             Long tenantId = connection.getTenant().getId();
@@ -275,17 +271,16 @@ public class TelegramWebhookController {
             }
             TenantContext.set(tenantId);
             try {
-                LedgerIngestionResult result = ingestionService.finalizeDirection(
-                        ingestionId, chatId, tenantId, callbackMessageId, ownerId, direction);
+                LedgerIngestionResult result = ingestionService.finalizeDirection(pending.get(), ownerId, direction);
+                pendingLedgerStore.remove(token);
                 telegramService.sendMessage(chatId, ingestionWorker.completedText(result));
             } catch (Exception e) {
-                ingestionService.markFailed(ingestionId, e.getMessage());
                 telegramService.sendMessage(chatId, "No pude guardar el registro. Revisa el documento o intenta nuevamente.");
             } finally {
                 TenantContext.clear();
             }
         }, () -> {
-            log.warn("Telegram callback for chatId={} ingestionId={} has no enabled connection", chatId, ingestionId);
+            log.warn("Telegram callback for chatId={} token={} has no enabled connection", chatId, token);
             telegramService.sendMessage(chatId, RECONNECT_INSTRUCTIONS);
         });
     }

@@ -4,6 +4,7 @@ import com.example.demo.dto.LedgerExtraction;
 import com.example.demo.dto.LedgerIngestionResult;
 import com.example.demo.exceptions.AiServiceException;
 import com.example.demo.exceptions.TelegramApiException;
+import com.example.demo.service.ingestion.PendingLedgerStore;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -23,21 +24,24 @@ public class TelegramIngestionWorker {
     private final AiService aiService;
     private final TelegramService telegramService;
     private final LedgerIngestionService ingestionService;
+    private final PendingLedgerStore store;
 
     public TelegramIngestionWorker(AiService aiService,
                                    TelegramService telegramService,
-                                   LedgerIngestionService ingestionService) {
+                                   LedgerIngestionService ingestionService,
+                                   PendingLedgerStore store) {
         this.aiService = aiService;
         this.telegramService = telegramService;
         this.ingestionService = ingestionService;
+        this.store = store;
     }
 
-    public void processText(Long ingestionId, String chatId, String text) {
-        process(ingestionId, chatId, () -> aiService.parseLedgerText(text));
+    public void processText(long token, String chatId, String text) {
+        process(token, chatId, () -> aiService.parseLedgerText(text));
     }
 
-    public void processMedia(Long ingestionId, String chatId, String fileId, String mediaType, String caption) {
-        process(ingestionId, chatId, () -> {
+    public void processMedia(long token, String chatId, String fileId, String mediaType, String caption) {
+        process(token, chatId, () -> {
             if (!ALLOWED_MEDIA.contains(mediaType)) {
                 throw new IllegalArgumentException("Formato no soportado");
             }
@@ -47,31 +51,21 @@ public class TelegramIngestionWorker {
         });
     }
 
-    public void echoCompleted(Long ingestionId, String chatId, Long tenantId) {
+    private void process(long token, String chatId, ExtractionCall call) {
         try {
-            telegramService.sendMessage(chatId, completedText(
-                    ingestionService.getCompletedResult(ingestionId, chatId, tenantId)));
-        } catch (Exception ignored) {
-            // A duplicate delivery must not mutate a completed ingestion.
-        }
-    }
-
-    private void process(Long ingestionId, String chatId, ExtractionCall call) {
-        try {
-            LedgerExtraction extraction = call.extract();
-            ingestionService.markPending(ingestionId, extraction);
-            String callbackPrefix = "ledger:" + ingestionId + ":";
-            long callbackMessageId = telegramService.sendMessageWithButtons(
+            LedgerExtraction extraction = ingestionService.normalizeExtraction(call.extract());
+            store.attachExtraction(token, extraction);
+            String callbackPrefix = "ledger:" + token + ":";
+            telegramService.sendMessageWithButtons(
                     chatId,
-                    pendingText(ingestionService.normalizeExtraction(extraction)),
+                    pendingText(extraction),
                     List.of(
                             new TelegramService.InlineButton("Cobro (factura)", callbackPrefix + "COBRO"),
                             new TelegramService.InlineButton("Gasto (proveedor)", callbackPrefix + "GASTO")
                     )
             );
-            ingestionService.recordCallbackMessage(ingestionId, callbackMessageId);
         } catch (TelegramApiException e) {
-            ingestionService.markFailed(ingestionId, "Telegram: " + e.getReason());
+            store.remove(token);
             if (e.getReason() == TelegramApiException.Reason.TOO_LARGE) {
                 telegramService.sendMessage(chatId, "El archivo es demasiado grande. Envia uno de menor tamano.");
             } else if (e.getReason() == TelegramApiException.Reason.DOWNLOAD
@@ -79,16 +73,16 @@ public class TelegramIngestionWorker {
                 telegramService.sendMessage(chatId, "No pude descargar el archivo. Reenvialo e intenta nuevamente.");
             }
         } catch (AiServiceException e) {
-            ingestionService.markFailed(ingestionId, "Claude: " + e.getReason());
+            store.remove(token);
             String message = e.getReason() == AiServiceException.Reason.NOT_CONFIGURED
                     ? "La carga automatica no esta disponible temporalmente."
                     : READ_FAILURE_MESSAGE;
             telegramService.sendMessage(chatId, message);
         } catch (IllegalArgumentException e) {
-            ingestionService.markFailed(ingestionId, e.getMessage());
+            store.remove(token);
             telegramService.sendMessage(chatId, READ_FAILURE_MESSAGE);
         } catch (Exception e) {
-            ingestionService.markFailed(ingestionId, "Unexpected processing failure");
+            store.remove(token);
             telegramService.sendMessage(chatId, "La carga automatica no esta disponible temporalmente.");
         }
     }

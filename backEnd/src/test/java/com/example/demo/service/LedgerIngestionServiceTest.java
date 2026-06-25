@@ -1,33 +1,30 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.LedgerExtraction;
+import com.example.demo.dto.LedgerIngestionResult;
 import com.example.demo.dto.LedgerLineItemExtraction;
 import com.example.demo.model.LedgerDirection;
-import com.example.demo.model.TelegramIngestionStatus;
-import com.example.demo.model.TelegramLedgerIngestion;
-import com.example.demo.model.Tenant;
+import com.example.demo.model.LedgerRecordType;
+import com.example.demo.model.Costs;
 import com.example.demo.repository.CustomerRepo;
-import com.example.demo.repository.TelegramLedgerIngestionRepo;
 import com.example.demo.repository.TenantRepo;
+import com.example.demo.service.ingestion.PendingLedger;
 import org.junit.jupiter.api.Test;
-import org.springframework.transaction.PlatformTransactionManager;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class LedgerIngestionServiceTest {
-    private final TelegramLedgerIngestionRepo ingestionRepo = mock(TelegramLedgerIngestionRepo.class);
     private final InvoiceService invoiceService = mock(InvoiceService.class);
     private final CostService costService = mock(CostService.class);
+    private final ActivityLogService activityLogService = mock(ActivityLogService.class);
     private final LedgerIngestionService service = new LedgerIngestionService(
-            ingestionRepo, mock(TenantRepo.class), mock(CustomerRepo.class),
-            invoiceService, costService, mock(PlatformTransactionManager.class),
-            mock(ActivityLogService.class));
+            mock(TenantRepo.class), mock(CustomerRepo.class), invoiceService, costService, activityLogService);
 
     @Test
     void acceptsPositiveConsistentExtraction() {
@@ -83,19 +80,23 @@ class LedgerIngestionServiceTest {
     }
 
     @Test
-    void finalizeDirectionRejectsCallbackFromAnotherPendingMessage() {
-        Tenant tenant = new Tenant();
-        tenant.setId(1L);
-        TelegramLedgerIngestion ingestion = new TelegramLedgerIngestion();
-        ingestion.setId(7L);
-        ingestion.setChatId("42");
-        ingestion.setTenant(tenant);
-        ingestion.setCallbackMessageId(70L);
-        ingestion.setStatus(TelegramIngestionStatus.PENDING_DIRECTION);
-        when(ingestionRepo.findLockedById(7L)).thenReturn(Optional.of(ingestion));
+    void finalizeDirectionCreatesCostFromPendingLedger() {
+        LedgerExtraction extraction = new LedgerExtraction("Documento", "Proveedor", null, null, null,
+                new BigDecimal("20.00"), LocalDate.of(2026, 6, 24), null, "Mercaderia", List.of());
+        PendingLedger pending = new PendingLedger(7L, "42", 9L, 1L, extraction, Instant.now());
+        Costs cost = new Costs();
+        cost.setId(11L);
+        when(costService.createForTenant(any(), eq(1L), eq(2L))).thenReturn(cost);
 
-        assertThrows(SecurityException.class,
-                () -> service.finalizeDirection(7L, "42", 1L, 71L, 2L, LedgerDirection.COBRO));
+        LedgerIngestionResult result = service.finalizeDirection(pending, 2L, LedgerDirection.GASTO);
+
+        assertEquals(7L, result.ingestionId());
+        assertEquals(LedgerDirection.GASTO, result.direction());
+        assertEquals(LedgerRecordType.COST, result.recordType());
+        assertEquals(11L, result.recordId());
+        assertEquals(new BigDecimal("20.00"), result.amount());
+        assertEquals("Proveedor", result.counterparty());
+        assertEquals(LocalDate.of(2026, 6, 24), result.date());
     }
 
     private LedgerExtraction extraction(BigDecimal amount, List<LedgerLineItemExtraction> lines) {

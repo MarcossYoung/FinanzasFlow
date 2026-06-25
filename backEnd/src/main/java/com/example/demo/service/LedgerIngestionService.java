@@ -3,26 +3,19 @@ package com.example.demo.service;
 import com.example.demo.dto.*;
 import com.example.demo.model.*;
 import com.example.demo.repository.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataIntegrityViolationException;
+import com.example.demo.service.ingestion.PendingLedger;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Service
 public class LedgerIngestionService {
-    public record ClaimResult(Long ingestionId, boolean shouldProcess, TelegramIngestionStatus status) {}
     private static final BigDecimal MAX_MONEY = new BigDecimal("9999999999.99");
     private static final int MAX_TITLE_LENGTH = 255;
     private static final int MAX_NAME_LENGTH = 255;
@@ -32,159 +25,45 @@ public class LedgerIngestionService {
     private static final int MAX_DESCRIPTION_LENGTH = 2000;
     private static final int MAX_LINE_DESCRIPTION_LENGTH = 255;
 
-    private final TelegramLedgerIngestionRepo ingestionRepo;
     private final TenantRepo tenantRepo;
     private final CustomerRepo customerRepo;
     private final InvoiceService invoiceService;
     private final CostService costService;
     private final ActivityLogService activityLogService;
-    private final TransactionTemplate transactionTemplate;
-    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules()
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    @Value("${telegram.ingestion.stale-minutes:10}")
-    private long staleMinutes;
-
-    public LedgerIngestionService(TelegramLedgerIngestionRepo ingestionRepo,
-                                  TenantRepo tenantRepo,
+    public LedgerIngestionService(TenantRepo tenantRepo,
                                   CustomerRepo customerRepo,
                                   InvoiceService invoiceService,
                                   CostService costService,
-                                  PlatformTransactionManager transactionManager,
                                   ActivityLogService activityLogService) {
-        this.ingestionRepo = ingestionRepo;
         this.tenantRepo = tenantRepo;
         this.customerRepo = customerRepo;
         this.invoiceService = invoiceService;
         this.costService = costService;
         this.activityLogService = activityLogService;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
-    }
-
-    public ClaimResult claim(String chatId, Long messageId, Long tenantId) {
-        if (chatId == null || chatId.isBlank() || messageId == null || tenantId == null) {
-            throw new IllegalArgumentException("Telegram source and tenant are required");
-        }
-        try {
-            ClaimResult created = transactionTemplate.execute(status -> {
-                Tenant tenant = tenantRepo.findById(tenantId)
-                        .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
-                LocalDateTime now = LocalDateTime.now();
-                TelegramLedgerIngestion ingestion = new TelegramLedgerIngestion();
-                ingestion.setChatId(chatId);
-                ingestion.setMessageId(messageId);
-                ingestion.setTenant(tenant);
-                ingestion.setStatus(TelegramIngestionStatus.PROCESSING);
-                ingestion.setCreatedAt(now);
-                ingestion.setUpdatedAt(now);
-                TelegramLedgerIngestion saved = ingestionRepo.saveAndFlush(ingestion);
-                return new ClaimResult(saved.getId(), true, saved.getStatus());
-            });
-            if (created != null) return created;
-        } catch (DataIntegrityViolationException ignored) {
-            // Another delivery already owns this source message.
-        }
-
-        TelegramLedgerIngestion existing = ingestionRepo.findByChatIdAndMessageId(chatId, messageId)
-                .orElseThrow(() -> new IllegalStateException("Duplicate ingestion claim was not found"));
-        if (existing.getStatus() == TelegramIngestionStatus.PROCESSING) {
-            Boolean reclaimed = transactionTemplate.execute(status -> ingestionRepo.reclaimIfStale(
-                    existing.getId(),
-                    TelegramIngestionStatus.PROCESSING,
-                    LocalDateTime.now().minusMinutes(staleMinutes),
-                    LocalDateTime.now()
-            ) == 1);
-            if (Boolean.TRUE.equals(reclaimed)) {
-                return new ClaimResult(existing.getId(), true, TelegramIngestionStatus.PROCESSING);
-            }
-        }
-        return new ClaimResult(existing.getId(), false, existing.getStatus());
     }
 
     @Transactional
-    public void markPending(Long ingestionId, LedgerExtraction extraction) {
-        LedgerExtraction normalized = normalizeExtraction(extraction);
-        TelegramLedgerIngestion ingestion = ingestionRepo.findLockedById(ingestionId)
-                .orElseThrow(() -> new IllegalArgumentException("Ingestion not found"));
-        if (ingestion.getStatus() != TelegramIngestionStatus.PROCESSING) return;
-        ingestion.setExtractionJson(objectMapper.convertValue(normalized, Map.class));
-        ingestion.setStatus(TelegramIngestionStatus.PENDING_DIRECTION);
-        ingestion.setFailureReason(null);
-        ingestion.setUpdatedAt(LocalDateTime.now());
-    }
-
-    @Transactional
-    public void recordCallbackMessage(Long ingestionId, long callbackMessageId) {
-        ingestionRepo.findLockedById(ingestionId).ifPresent(ingestion -> {
-            if (ingestion.getStatus() == TelegramIngestionStatus.PENDING_DIRECTION) {
-                ingestion.setCallbackMessageId(callbackMessageId);
-                ingestion.setUpdatedAt(LocalDateTime.now());
-            }
-        });
-    }
-
-    @Transactional
-    public void markFailed(Long ingestionId, String reason) {
-        ingestionRepo.findLockedById(ingestionId).ifPresent(ingestion -> {
-            if (ingestion.getStatus() != TelegramIngestionStatus.COMPLETED) {
-                ingestion.setStatus(TelegramIngestionStatus.FAILED);
-                ingestion.setFailureReason(sanitizeFailure(reason));
-                ingestion.setUpdatedAt(LocalDateTime.now());
-            }
-        });
-    }
-
-    @Transactional
-    public LedgerIngestionResult finalizeDirection(Long ingestionId, String chatId, Long tenantId,
-                                                    Long callbackMessageId,
-                                                    Long ownerId, LedgerDirection direction) {
-        TelegramLedgerIngestion ingestion = ingestionRepo.findLockedById(ingestionId)
-                .orElseThrow(() -> new IllegalArgumentException("Ingestion not found"));
-        if (!ingestion.getChatId().equals(chatId) || !ingestion.getTenant().getId().equals(tenantId)) {
-            throw new SecurityException("Ingestion does not belong to this chat and tenant");
+    public LedgerIngestionResult finalizeDirection(PendingLedger pending, Long ownerId, LedgerDirection direction) {
+        if (pending == null) {
+            throw new IllegalArgumentException("Ingestion not found");
         }
-        if (callbackMessageId == null || ingestion.getCallbackMessageId() == null
-                || !ingestion.getCallbackMessageId().equals(callbackMessageId)) {
-            throw new SecurityException("Callback does not belong to this pending ingestion");
-        }
-        LedgerExtraction extraction = normalizeExtraction(readExtraction(ingestion));
-        if (ingestion.getStatus() == TelegramIngestionStatus.COMPLETED) {
-            return resultFrom(ingestion, extraction, true);
-        }
-        if (ingestion.getStatus() != TelegramIngestionStatus.PENDING_DIRECTION) {
-            throw new IllegalStateException("Ingestion is not pending direction");
-        }
+        LedgerExtraction extraction = normalizeExtraction(pending.extraction());
         LedgerRecordType recordType;
         Long recordId;
         if (direction == LedgerDirection.COBRO) {
-            Customer customer = resolveOrCreateCustomer(extraction, tenantId);
-            InvoiceResponse invoice = invoiceService.createForTenant(toInvoiceRequest(extraction, customer), tenantId, ownerId);
+            Customer customer = resolveOrCreateCustomer(extraction, pending.tenantId());
+            InvoiceResponse invoice = invoiceService.createForTenant(toInvoiceRequest(extraction, customer), pending.tenantId(), ownerId);
             recordType = LedgerRecordType.INVOICE;
             recordId = invoice.id();
         } else {
-            Costs cost = costService.createForTenant(toCostRequest(extraction), tenantId, ownerId);
+            Costs cost = costService.createForTenant(toCostRequest(extraction), pending.tenantId(), ownerId);
             recordType = LedgerRecordType.COST;
             recordId = cost.getId();
         }
 
-        ingestion.setDirection(direction);
-        ingestion.setRecordType(recordType);
-        ingestion.setRecordId(recordId);
-        ingestion.setStatus(TelegramIngestionStatus.COMPLETED);
-        ingestion.setUpdatedAt(LocalDateTime.now());
-        activityLogService.record(tenantId, ActivityLogService.TELEGRAM_INGESTION, ownerId);
-        return resultFrom(ingestion, extraction, false);
-    }
-
-    @Transactional(readOnly = true)
-    public LedgerIngestionResult getCompletedResult(Long ingestionId, String chatId, Long tenantId) {
-        TelegramLedgerIngestion ingestion = ingestionRepo.findById(ingestionId)
-                .orElseThrow(() -> new IllegalArgumentException("Ingestion not found"));
-        if (!ingestion.getChatId().equals(chatId) || !ingestion.getTenant().getId().equals(tenantId)
-                || ingestion.getStatus() != TelegramIngestionStatus.COMPLETED) {
-            throw new IllegalStateException("Ingestion is not completed for this chat");
-        }
-        return resultFrom(ingestion, readExtraction(ingestion), true);
+        activityLogService.record(pending.tenantId(), ActivityLogService.TELEGRAM_INGESTION, ownerId);
+        return resultFrom(pending.token(), direction, recordType, recordId, extraction, false);
     }
 
     public void validateExtraction(LedgerExtraction extraction) {
@@ -299,28 +178,16 @@ public class LedgerIngestionService {
         );
     }
 
-    private LedgerExtraction readExtraction(TelegramLedgerIngestion ingestion) {
-        if (ingestion.getExtractionJson() == null) {
-            throw new IllegalStateException("Ingestion has no extraction");
-        }
-        return objectMapper.convertValue(ingestion.getExtractionJson(), LedgerExtraction.class);
-    }
-
-    private LedgerIngestionResult resultFrom(TelegramLedgerIngestion ingestion, LedgerExtraction extraction,
-                                             boolean alreadyCompleted) {
-        LocalDate date = ingestion.getDirection() == LedgerDirection.GASTO
+    private LedgerIngestionResult resultFrom(Long ingestionId, LedgerDirection direction, LedgerRecordType recordType,
+                                             Long recordId, LedgerExtraction extraction, boolean alreadyCompleted) {
+        LocalDate date = direction == LedgerDirection.GASTO
                 ? (extraction.issueDate() != null ? extraction.issueDate() : LocalDate.now())
                 : extraction.dueDate();
         return new LedgerIngestionResult(
-                ingestion.getId(), ingestion.getDirection(), ingestion.getRecordType(), ingestion.getRecordId(),
+                ingestionId, direction, recordType, recordId,
                 extraction.amount(), firstMeaningful(extraction.counterpartyName(), extraction.cuitDni(), extraction.email()),
                 date, alreadyCompleted
         );
-    }
-
-    private String sanitizeFailure(String reason) {
-        String safe = reason == null || reason.isBlank() ? "Error de procesamiento" : reason.replaceAll("[\\r\\n]+", " ");
-        return safe.length() > 500 ? safe.substring(0, 500) : safe;
     }
 
     private String firstMeaningful(String... values) {

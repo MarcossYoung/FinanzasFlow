@@ -1,6 +1,5 @@
 package com.example.demo.controller;
 
-import com.example.demo.model.TelegramIngestionStatus;
 import com.example.demo.model.LedgerDirection;
 import com.example.demo.model.LedgerRecordType;
 import com.example.demo.model.AppUser;
@@ -12,10 +11,13 @@ import com.example.demo.service.LedgerIngestionService;
 import com.example.demo.service.TelegramConnectionService;
 import com.example.demo.service.TelegramIngestionWorker;
 import com.example.demo.service.TelegramService;
+import com.example.demo.service.ingestion.PendingLedger;
+import com.example.demo.service.ingestion.PendingLedgerStore;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -35,13 +37,13 @@ class TelegramWebhookControllerTest {
     private final TelegramConnectionService connectionService = mock(TelegramConnectionService.class);
     private final LedgerIngestionService ingestionService = mock(LedgerIngestionService.class);
     private final TelegramIngestionWorker worker = mock(TelegramIngestionWorker.class);
+    private final PendingLedgerStore pendingLedgerStore = mock(PendingLedgerStore.class);
     private final Executor directExecutor = Runnable::run;
 
     @Test
     void selectsLargestPhotoForConnectedChat() {
         when(connectionService.resolveConnection("42")).thenReturn(Optional.of(connection(1L, 2L)));
-        when(ingestionService.claim("42", 9L, 1L))
-                .thenReturn(new LedgerIngestionService.ClaimResult(7L, true, TelegramIngestionStatus.PROCESSING));
+        when(pendingLedgerStore.claim("42", 9L, 1L)).thenReturn(Optional.of(7L));
         TelegramWebhookController controller = controller();
         Map<String, Object> update = Map.of("message", Map.of(
                 "message_id", 9,
@@ -65,13 +67,13 @@ class TelegramWebhookControllerTest {
 
         assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
         verify(telegramService).sendMessage(eq("99"), contains("/connect"));
-        verifyNoInteractions(ingestionService, worker);
+        verifyNoInteractions(ingestionService, worker, pendingLedgerStore);
     }
 
     @Test
     void acceptedSecretStillReturnsOkWhenProcessingFails() {
         when(connectionService.resolveConnection("42")).thenReturn(Optional.of(connection(1L, 2L)));
-        when(ingestionService.claim("42", 9L, 1L)).thenThrow(new RuntimeException("bad state"));
+        when(pendingLedgerStore.claim("42", 9L, 1L)).thenThrow(new RuntimeException("bad state"));
         TelegramWebhookController controller = controller();
         Map<String, Object> update = Map.of("message", Map.of(
                 "message_id", 9,
@@ -87,9 +89,10 @@ class TelegramWebhookControllerTest {
         LedgerIngestionResult result = new LedgerIngestionResult(
                 7L, LedgerDirection.COBRO, LedgerRecordType.INVOICE, 11L,
                 new BigDecimal("123.45"), "ACME", LocalDate.of(2026, 6, 24), false);
+        PendingLedger pending = pending();
         when(connectionService.resolveConnection("42")).thenReturn(Optional.of(connection(1L, 2L)));
-        when(ingestionService.finalizeDirection(7L, "42", 1L, 70L, 2L, LedgerDirection.COBRO))
-                .thenReturn(result);
+        when(pendingLedgerStore.get(7L)).thenReturn(Optional.of(pending));
+        when(ingestionService.finalizeDirection(pending, 2L, LedgerDirection.COBRO)).thenReturn(result);
         when(worker.completedText(result)).thenReturn("Guardado como invoice: #11");
         TelegramWebhookController controller = controller();
         Map<String, Object> update = Map.of("callback_query", Map.of(
@@ -101,12 +104,14 @@ class TelegramWebhookControllerTest {
 
         assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
         verify(telegramService).answerCallbackQuery("callback-1");
-        verify(ingestionService).finalizeDirection(7L, "42", 1L, 70L, 2L, LedgerDirection.COBRO);
+        verify(ingestionService).finalizeDirection(pending, 2L, LedgerDirection.COBRO);
+        verify(pendingLedgerStore).remove(7L);
         verify(telegramService).sendMessage("42", "Guardado como invoice: #11");
     }
 
     @Test
     void callbackWithoutConnectionStillAnswersAndDoesNotFinalize() {
+        when(pendingLedgerStore.get(7L)).thenReturn(Optional.of(pending()));
         when(connectionService.resolveConnection("42")).thenReturn(Optional.empty());
         TelegramWebhookController controller = controller();
         Map<String, Object> update = Map.of("callback_query", Map.of(
@@ -119,13 +124,15 @@ class TelegramWebhookControllerTest {
         assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
         verify(telegramService).answerCallbackQuery("callback-1");
         verify(telegramService).sendMessage("42", "Este chat no esta conectado. Reconecta con /connect.");
-        verify(ingestionService, never()).finalizeDirection(anyLong(), anyString(), anyLong(), any(), anyLong(), any());
+        verify(ingestionService, never()).finalizeDirection(any(PendingLedger.class), anyLong(), any());
     }
 
     @Test
-    void callbackFailureMarksIngestionFailedAndSendsSafeMessage() {
+    void callbackFailureKeepsPendingTokenAndSendsSafeMessage() {
+        PendingLedger pending = pending();
+        when(pendingLedgerStore.get(7L)).thenReturn(Optional.of(pending));
         when(connectionService.resolveConnection("42")).thenReturn(Optional.of(connection(1L, 2L)));
-        when(ingestionService.finalizeDirection(7L, "42", 1L, 70L, 2L, LedgerDirection.COBRO))
+        when(ingestionService.finalizeDirection(pending, 2L, LedgerDirection.COBRO))
                 .thenThrow(new IllegalArgumentException("El total debe ser positivo"));
         TelegramWebhookController controller = controller();
         Map<String, Object> update = Map.of("callback_query", Map.of(
@@ -136,15 +143,20 @@ class TelegramWebhookControllerTest {
         ));
 
         assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
-        verify(ingestionService).markFailed(7L, "El total debe ser positivo");
+        verify(pendingLedgerStore, never()).remove(7L);
         verify(telegramService).sendMessage("42", "No pude guardar el registro. Revisa el documento o intenta nuevamente.");
     }
 
     @Test
-    void callbackWithoutMessageIdDoesNotFinalizePendingIngestion() {
+    void callbackWithoutMessageIdStillFinalizesPendingIngestion() {
+        PendingLedger pending = pending();
+        LedgerIngestionResult result = new LedgerIngestionResult(
+                7L, LedgerDirection.COBRO, LedgerRecordType.INVOICE, 11L,
+                new BigDecimal("123.45"), "ACME", LocalDate.of(2026, 6, 24), false);
+        when(pendingLedgerStore.get(7L)).thenReturn(Optional.of(pending));
         when(connectionService.resolveConnection("42")).thenReturn(Optional.of(connection(1L, 2L)));
-        when(ingestionService.finalizeDirection(7L, "42", 1L, null, 2L, LedgerDirection.COBRO))
-                .thenThrow(new SecurityException("Callback does not belong to this pending ingestion"));
+        when(ingestionService.finalizeDirection(pending, 2L, LedgerDirection.COBRO)).thenReturn(result);
+        when(worker.completedText(result)).thenReturn("Guardado como invoice: #11");
         TelegramWebhookController controller = controller();
         Map<String, Object> update = Map.of("callback_query", Map.of(
                 "id", "callback-1",
@@ -154,8 +166,9 @@ class TelegramWebhookControllerTest {
         ));
 
         assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
-        verify(ingestionService).markFailed(7L, "Callback does not belong to this pending ingestion");
-        verify(telegramService).sendMessage("42", "No pude guardar el registro. Revisa el documento o intenta nuevamente.");
+        verify(ingestionService).finalizeDirection(pending, 2L, LedgerDirection.COBRO);
+        verify(pendingLedgerStore).remove(7L);
+        verify(telegramService).sendMessage("42", "Guardado como invoice: #11");
     }
 
     @Test
@@ -175,7 +188,11 @@ class TelegramWebhookControllerTest {
     private TelegramWebhookController controller() {
         return new TelegramWebhookController(
                 customerRepo, reminderRepo, invoiceRepo, workOrderRepo, telegramService,
-                connectionService, ingestionService, worker, directExecutor, "secret");
+                connectionService, ingestionService, worker, pendingLedgerStore, directExecutor, "secret");
+    }
+
+    private PendingLedger pending() {
+        return new PendingLedger(7L, "42", 9L, 1L, null, Instant.now());
     }
 
     private TelegramConnection connection(Long tenantId, Long ownerId) {
