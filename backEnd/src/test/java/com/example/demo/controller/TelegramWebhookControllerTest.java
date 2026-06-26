@@ -148,6 +148,28 @@ class TelegramWebhookControllerTest {
     }
 
     @Test
+    void callbackWithBrokenConnectionSendsErrorMessageAndDoesNotFinalize() {
+        TelegramConnection brokenConn = mock(TelegramConnection.class);
+        when(brokenConn.getTenant()).thenThrow(new RuntimeException("simulated lazy failure"));
+        PendingLedger pending = pending();
+        when(pendingLedgerStore.get(7L)).thenReturn(Optional.of(pending));
+        when(connectionService.resolveConnection("42")).thenReturn(Optional.of(brokenConn));
+        TelegramWebhookController controller = controller();
+        Map<String, Object> update = Map.of("callback_query", Map.of(
+                "id", "callback-1",
+                "from", Map.of("id", 99),
+                "message", Map.of("message_id", 70, "chat", Map.of("id", 42)),
+                "data", "ledger:7:COBRO"
+        ));
+
+        assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
+        verify(telegramService).sendMessage("42",
+                "No pude guardar el registro. Revisa el documento o intenta nuevamente.");
+        verify(pendingLedgerStore, never()).remove(anyLong());
+        verify(ingestionService, never()).finalizeDirection(any(PendingLedger.class), anyLong(), any());
+    }
+
+    @Test
     void callbackWithoutMessageIdStillFinalizesPendingIngestion() {
         PendingLedger pending = pending();
         LedgerIngestionResult result = new LedgerIngestionResult(
