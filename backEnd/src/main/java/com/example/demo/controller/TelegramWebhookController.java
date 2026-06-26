@@ -263,21 +263,24 @@ public class TelegramWebhookController {
         Optional<TelegramConnection> resolvedConnection = connectionService.resolveConnection(chatId);
 
         resolvedConnection.ifPresentOrElse(connection -> {
-            Long tenantId = connection.getTenant().getId();
-            Long ownerId = connection.getDefaultOwner() == null ? null : connection.getDefaultOwner().getId();
-            if (ownerId == null) {
-                telegramService.sendMessage(chatId, "No pude guardar el registro: falta usuario responsable para este chat.");
-                return;
-            }
-            TenantContext.set(tenantId);
+            boolean tenantSet = false;
             try {
+                Long tenantId = connection.getTenant().getId();
+                Long ownerId = connection.getDefaultOwner() == null ? null : connection.getDefaultOwner().getId();
+                if (ownerId == null) {
+                    telegramService.sendMessage(chatId, "No pude guardar el registro: falta usuario responsable para este chat.");
+                    return;
+                }
+                TenantContext.set(tenantId);
+                tenantSet = true;
                 LedgerIngestionResult result = ingestionService.finalizeDirection(pending.get(), ownerId, direction);
                 pendingLedgerStore.remove(token);
                 telegramService.sendMessage(chatId, ingestionWorker.completedText(result));
             } catch (Exception e) {
+                log.error("Telegram callback processing failed token={} chatId={}", token, chatId, e);
                 telegramService.sendMessage(chatId, "No pude guardar el registro. Revisa el documento o intenta nuevamente.");
             } finally {
-                TenantContext.clear();
+                if (tenantSet) TenantContext.clear();
             }
         }, () -> {
             log.warn("Telegram callback for chatId={} token={} has no enabled connection", chatId, token);
