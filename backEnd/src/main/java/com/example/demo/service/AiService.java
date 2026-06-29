@@ -248,21 +248,29 @@ public class AiService {
     }
 
     public LedgerExtraction parseLedgerText(String text) {
+        return parseLedgerExtraction(rawLedgerResponseFromText(text));
+    }
+
+    public String rawLedgerResponseFromText(String text) {
         if (text == null || text.isBlank()) {
             throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Ledger text is empty");
         }
-        return parseLedgerJson(postToAnthropic(textBody(
+        return postToAnthropic(textBody(
                 LEDGER_EXTRACTION_SYSTEM,
                 "Extrae los datos contables de este texto:\n" + text,
                 500
-        )));
+        ));
     }
 
     public LedgerExtraction parseLedgerMediaFromBytes(byte[] bytes, String mediaType, String caption) {
+        return parseLedgerExtraction(rawLedgerResponseFromMedia(bytes, mediaType, caption));
+    }
+
+    public String rawLedgerResponseFromMedia(byte[] bytes, String mediaType, String caption) {
         if (bytes == null || bytes.length == 0) {
             throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Ledger media is empty");
         }
-        return parseLedgerJson(callClaudeVision(
+        return callClaudeVision(
                 LEDGER_EXTRACTION_SYSTEM,
                 bytes,
                 mediaType,
@@ -270,7 +278,11 @@ public class AiService {
                         ? "Extrae los datos contables de este documento."
                         : "Contexto del usuario: " + caption,
                 500
-        ));
+        );
+    }
+
+    public LedgerExtraction parseLedgerExtraction(String raw) {
+        return parseLedgerJson(raw);
     }
 
     public String generateFinanceInsight(String from, String to) {

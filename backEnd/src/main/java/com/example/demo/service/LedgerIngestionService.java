@@ -70,6 +70,22 @@ public class LedgerIngestionService {
         normalizeExtraction(extraction);
     }
 
+    public String previewDirection(PendingLedger pending, LedgerDirection direction) {
+        if (pending == null) {
+            throw new IllegalArgumentException("Ingestion not found");
+        }
+        LedgerExtraction extraction = normalizeExtraction(pending.extraction());
+        if (direction == LedgerDirection.COBRO) {
+            Customer customer = new Customer();
+            customer.setName(firstMeaningful(extraction.counterpartyName(), extraction.cuitDni(), extraction.email()));
+            customer.setCuitDni(trimToNull(extraction.cuitDni()));
+            customer.setEmail(trimToNull(extraction.email()));
+            customer.setPhone(trimToNull(extraction.phone()));
+            return toInvoiceRequest(extraction, customer).toString();
+        }
+        return toCostRequest(extraction).toString();
+    }
+
     public LedgerExtraction normalizeExtraction(LedgerExtraction extraction) {
         if (extraction == null || extraction.amount() == null || extraction.amount().signum() <= 0) {
             throw new IllegalArgumentException("El total debe ser positivo");

@@ -16,7 +16,8 @@ class TelegramIngestionWorkerTest {
     private final TelegramService telegramService = mock(TelegramService.class);
     private final LedgerIngestionService ingestionService = mock(LedgerIngestionService.class);
     private final PendingLedgerStore store = mock(PendingLedgerStore.class);
-    private final TelegramIngestionWorker worker = new TelegramIngestionWorker(aiService, telegramService, ingestionService, store);
+    private final TelegramIngestionWorker worker = new TelegramIngestionWorker(
+            aiService, telegramService, ingestionService, store, false);
 
     @Test
     void invalidExtractionMarksFailedAndDoesNotSendButtons() {
@@ -54,5 +55,44 @@ class TelegramIngestionWorkerTest {
 
         verify(store).attachExtraction(7L, extraction);
         verify(telegramService).sendMessageWithButtons(eq("42"), contains("Detectado"), anyList());
+    }
+
+    @Test
+    void debugTextEchoesRawParsedFieldsAndButtons() {
+        TelegramIngestionWorker debugWorker = new TelegramIngestionWorker(
+                aiService, telegramService, ingestionService, store, true);
+        String raw = "{\"counterpartyName\":\"ACME\",\"amount\":20,\"lineItems\":[]}";
+        LedgerExtraction extraction = new LedgerExtraction("Factura", "ACME", "20-1", "a@b.com", "123",
+                new BigDecimal("20.00"), null, null, "nota", List.of());
+        when(aiService.rawLedgerResponseFromText("factura")).thenReturn(raw);
+        when(aiService.parseLedgerExtraction(raw)).thenReturn(extraction);
+        when(ingestionService.normalizeExtraction(extraction)).thenReturn(extraction);
+
+        debugWorker.processText(7L, "42", "factura");
+
+        verify(telegramService).sendMessage("42", "[DEBUG] RAW IA:\n" + raw);
+        verify(telegramService).sendMessage(eq("42"), contains("counterpartyName: ACME"));
+        verify(store).attachExtraction(7L, extraction);
+        verify(telegramService).sendMessageWithButtons(eq("42"), contains("Detectado"), anyList());
+    }
+
+    @Test
+    void debugTextEchoesRejectionReasonAndRemovesPending() {
+        TelegramIngestionWorker debugWorker = new TelegramIngestionWorker(
+                aiService, telegramService, ingestionService, store, true);
+        String raw = "{\"counterpartyName\":\"ACME\"}";
+        when(aiService.rawLedgerResponseFromText("bad")).thenReturn(raw);
+        when(aiService.parseLedgerExtraction(raw))
+                .thenThrow(new com.example.demo.exceptions.AiServiceException(
+                        com.example.demo.exceptions.AiServiceException.Reason.INVALID_JSON,
+                        "Claude extraction omitted a positive amount"));
+
+        debugWorker.processText(7L, "42", "bad");
+
+        verify(telegramService).sendMessage("42", "[DEBUG] RAW IA:\n" + raw);
+        verify(telegramService).sendMessage("42",
+                "[DEBUG] RECHAZADO: Claude extraction omitted a positive amount");
+        verify(store).remove(7L);
+        verify(telegramService, never()).sendMessageWithButtons(anyString(), anyString(), anyList());
     }
 }
