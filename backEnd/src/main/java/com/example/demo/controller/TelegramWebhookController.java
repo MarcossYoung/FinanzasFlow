@@ -63,6 +63,7 @@ public class TelegramWebhookController {
     private final TelegramIngestionWorker ingestionWorker;
     private final PendingLedgerStore pendingLedgerStore;
     private final Executor ingestionExecutor;
+    private final boolean debugEcho;
 
     public TelegramWebhookController(CustomerRepo customerRepo,
                                      PaymentReminderRepo reminderRepo,
@@ -74,7 +75,8 @@ public class TelegramWebhookController {
                                      TelegramIngestionWorker ingestionWorker,
                                      PendingLedgerStore pendingLedgerStore,
                                      @Qualifier("telegramIngestionExecutor") Executor ingestionExecutor,
-                                     @Value("${telegram.webhook.secret-token:}") String webhookSecretToken) {
+                                     @Value("${telegram.webhook.secret-token:}") String webhookSecretToken,
+                                     @Value("${telegram.ingestion.debug-echo:false}") boolean debugEcho) {
         this.customerRepo = customerRepo;
         this.reminderRepo = reminderRepo;
         this.invoiceRepo = invoiceRepo;
@@ -86,6 +88,7 @@ public class TelegramWebhookController {
         this.pendingLedgerStore = pendingLedgerStore;
         this.ingestionExecutor = ingestionExecutor;
         this.webhookSecretToken = webhookSecretToken == null ? "" : webhookSecretToken.trim();
+        this.debugEcho = debugEcho;
     }
 
     @PostMapping("/webhook")
@@ -267,12 +270,19 @@ public class TelegramWebhookController {
             try {
                 Long tenantId = connection.getTenant().getId();
                 Long ownerId = connection.getDefaultOwner() == null ? null : connection.getDefaultOwner().getId();
+                TenantContext.set(tenantId);
+                tenantSet = true;
+                if (debugEcho) {
+                    String preview = ingestionService.previewDirection(pending.get(), direction);
+                    pendingLedgerStore.remove(token);
+                    telegramService.sendMessage(chatId,
+                            "[DEBUG] NO GUARDADO (backend en pausa). Esto se enviaria al backend:\n" + truncate(preview));
+                    return;
+                }
                 if (ownerId == null) {
                     telegramService.sendMessage(chatId, "No pude guardar el registro: falta usuario responsable para este chat.");
                     return;
                 }
-                TenantContext.set(tenantId);
-                tenantSet = true;
                 LedgerIngestionResult result = ingestionService.finalizeDirection(pending.get(), ownerId, direction);
                 pendingLedgerStore.remove(token);
                 telegramService.sendMessage(chatId, ingestionWorker.completedText(result));
@@ -521,6 +531,13 @@ public class TelegramWebhookController {
         if (message == null || message.isBlank()) return fallback;
         String safe = message.replaceAll("[\\r\\n]+", " ").trim();
         return safe.length() > 300 ? safe.substring(0, 300) : safe;
+    }
+
+    private String truncate(String value) {
+        if (value == null) return "";
+        int max = 3900;
+        if (value.length() <= max) return value;
+        return value.substring(0, max) + "\n...[truncado]";
     }
 
     private Map<?, ?> asMap(Object value) {

@@ -20,11 +20,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class LedgerIngestionServiceTest {
+    private final TenantRepo tenantRepo = mock(TenantRepo.class);
+    private final CustomerRepo customerRepo = mock(CustomerRepo.class);
     private final InvoiceService invoiceService = mock(InvoiceService.class);
     private final CostService costService = mock(CostService.class);
     private final ActivityLogService activityLogService = mock(ActivityLogService.class);
     private final LedgerIngestionService service = new LedgerIngestionService(
-            mock(TenantRepo.class), mock(CustomerRepo.class), invoiceService, costService, activityLogService);
+            tenantRepo, customerRepo, invoiceService, costService, activityLogService);
 
     @Test
     void acceptsPositiveConsistentExtraction() {
@@ -97,6 +99,21 @@ class LedgerIngestionServiceTest {
         assertEquals(new BigDecimal("20.00"), result.amount());
         assertEquals("Proveedor", result.counterparty());
         assertEquals(LocalDate.of(2026, 6, 24), result.date());
+    }
+
+    @Test
+    void previewDirectionBuildsRequestWithoutPersistence() {
+        LedgerExtraction extraction = new LedgerExtraction("Factura", "Cliente", "20-1", "c@example.com", "123",
+                new BigDecimal("20.00"), LocalDate.of(2026, 6, 24), LocalDate.of(2026, 7, 1),
+                "Servicio", List.of());
+        PendingLedger pending = new PendingLedger(7L, "42", 9L, 1L, extraction, Instant.now());
+
+        String preview = service.previewDirection(pending, LedgerDirection.COBRO);
+
+        assertTrue(preview.contains("InvoiceCreateRequest"));
+        assertTrue(preview.contains("titulo=Factura"));
+        assertTrue(preview.contains("customerId=null"));
+        verifyNoInteractions(tenantRepo, customerRepo, invoiceService, costService, activityLogService);
     }
 
     private LedgerExtraction extraction(BigDecimal amount, List<LedgerLineItemExtraction> lines) {
