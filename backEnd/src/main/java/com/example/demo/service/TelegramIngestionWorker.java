@@ -217,6 +217,10 @@ public class TelegramIngestionWorker {
                         .append(value(row.unitPrice()));
             }
         }
+        sb.append("\noriginName: ").append(value(extraction.originName()));
+        sb.append("\noriginTaxId: ").append(value(extraction.originTaxId()));
+        sb.append("\ndestinationName: ").append(value(extraction.destinationName()));
+        sb.append("\ndestinationTaxId: ").append(value(extraction.destinationTaxId()));
         return truncate(sb.toString());
     }
 

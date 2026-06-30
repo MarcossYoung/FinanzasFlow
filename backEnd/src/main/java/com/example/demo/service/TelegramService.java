@@ -79,6 +79,17 @@ public class TelegramService {
         }
     }
 
+    public void registerWebhook(String webhookUrl, String secretToken) {
+        requireConfigured();
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("url", webhookUrl);
+        payload.put("secret_token", secretToken);
+        payload.put("allowed_updates", List.of("message", "edited_message", "callback_query"));
+        Map<String, Object> response = restTemplate.postForObject(
+                apiUrl("setWebhook"), payload, Map.class);
+        requireOk(response, TelegramApiException.Reason.API);
+    }
+
     public TelegramFile getFile(String fileId) {
         requireConfigured();
         if (fileId == null || fileId.isBlank()) {

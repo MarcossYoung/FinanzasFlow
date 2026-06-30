@@ -62,6 +62,30 @@ class AiServiceTest {
     }
 
     @Test
+    void parsesTransferExtractionWithOrigenAndDestino() {
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        AiService service = service(restTemplate);
+        String extraction = """
+                {"titulo":"Transferencia","counterpartyName":null,"cuitDni":null,
+                 "amount":5000,"lineItems":[],
+                 "originName":"Marcos Young","originTaxId":"20-30000000-1",
+                 "destinationName":"BIND PAGO SA","destinationTaxId":"33-71854885-9"}
+                """;
+        server.expect(requestTo(containsString("/v1/messages")))
+                .andRespond(withSuccess(anthropicTextResponse(extraction), MediaType.APPLICATION_JSON));
+
+        LedgerExtraction result = service.parseLedgerText("comprobante");
+
+        assertEquals("Marcos Young", result.originName());
+        assertEquals("20-30000000-1", result.originTaxId());
+        assertEquals("BIND PAGO SA", result.destinationName());
+        assertNull(result.counterpartyName());
+        assertEquals("5000", result.amount().toPlainString());
+        server.verify();
+    }
+
+    @Test
     void rejectsIncompleteOrWronglyTypedExtractions() {
         RestTemplate restTemplate = new RestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();

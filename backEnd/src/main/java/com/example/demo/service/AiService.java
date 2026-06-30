@@ -48,7 +48,15 @@ public class AiService {
             titulo (string o null), counterpartyName (string o null), cuitDni (string o null),
             email (string o null), phone (string o null), amount (numero o null, total del documento),
             issueDate (YYYY-MM-DD o null), dueDate (YYYY-MM-DD o null), description (string o null),
-            lineItems (array de objetos con description, quantity, unitPrice; [] si no hay detalle).
+            lineItems (array de objetos con description, quantity, unitPrice; [] si no hay detalle),
+            originName (string o null), originTaxId (string o null),
+            destinationName (string o null), destinationTaxId (string o null).
+            Para comprobantes de transferencia bancaria: extrae el nombre y CUIT/CBU del emisor
+            (Cuenta Origen / quien envia el dinero) en originName y originTaxId, y el nombre y
+            CUIT/CBU del receptor (Cuenta Destino) en destinationName y destinationTaxId.
+            En esos casos counterpartyName y cuitDni pueden quedar null.
+            Para facturas o documentos con una sola contraparte: usa counterpartyName y cuitDni
+            normalmente; deja originName, originTaxId, destinationName, destinationTaxId en null.
             No inventes importes, fechas, identidad ni contacto. Usa punto decimal y fechas ISO.
             """;
 
@@ -173,12 +181,18 @@ public class AiService {
                     dateField(map, "issueDate"),
                     dateField(map, "dueDate"),
                     stringField(map, "description"),
-                    lineItemsField(map)
+                    lineItemsField(map),
+                    stringField(map, "originName"),
+                    stringField(map, "originTaxId"),
+                    stringField(map, "destinationName"),
+                    stringField(map, "destinationTaxId")
             );
             if (extraction.amount() == null || extraction.amount().signum() <= 0) {
                 throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude extraction omitted a positive amount");
             }
-            if (isBlank(extraction.counterpartyName()) && isBlank(extraction.cuitDni()) && isBlank(extraction.email())) {
+            if (isBlank(extraction.counterpartyName()) && isBlank(extraction.cuitDni())
+                    && isBlank(extraction.email())
+                    && isBlank(extraction.originName()) && isBlank(extraction.originTaxId())) {
                 throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude extraction omitted counterparty identity");
             }
             return extraction;
