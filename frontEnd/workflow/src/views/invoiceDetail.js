@@ -3,15 +3,7 @@ import {useNavigate, useParams} from 'react-router-dom';
 import axios from 'axios';
 import {BASE_URL} from '../api/config';
 import {UserContext} from '../UserProvider';
-
-const statuses = [
-	'EN_GESTION',
-	'CONTACTADO',
-	'PROMETIO_PAGO',
-	'EN_DISPUTA',
-	'INCOBRABLE',
-	'CERRADO',
-];
+import {INVOICE_STATUS_OPTIONS} from '../constants/invoiceStatus';
 
 const formatMoney = (value) =>
 	value === null || value === undefined || value === ''
@@ -144,8 +136,8 @@ export default function InvoiceDetail() {
 						disabled={!canEdit || !invoice.workOrderId}
 						className='invoice-detail-status-select'
 					>
-						{statuses.map((status) => (
-							<option key={status} value={status}>{status}</option>
+						{INVOICE_STATUS_OPTIONS.map(({value, label}) => (
+							<option key={value} value={value}>{label}</option>
 						))}
 					</select>
 				</section>
