@@ -22,7 +22,7 @@ class TelegramIngestionWorkerTest {
     @Test
     void invalidExtractionMarksFailedAndDoesNotSendButtons() {
         LedgerExtraction invalid = new LedgerExtraction(null, "ACME", null, null, null,
-                null, null, null, null, List.of());
+                null, null, null, null, List.of(), null, null, null, null);
         when(aiService.parseLedgerText("bad")).thenReturn(invalid);
         doThrow(new IllegalArgumentException("El total debe ser positivo"))
                 .when(ingestionService).normalizeExtraction(invalid);
@@ -46,7 +46,7 @@ class TelegramIngestionWorkerTest {
     @Test
     void validExtractionSendsButtonsOnlyAfterPendingStateIsAccepted() {
         LedgerExtraction extraction = new LedgerExtraction(null, "ACME", null, null, null,
-                new BigDecimal("20.00"), null, null, null, List.of());
+                new BigDecimal("20.00"), null, null, null, List.of(), null, null, null, null);
         when(aiService.parseLedgerText("factura")).thenReturn(extraction);
         when(ingestionService.normalizeExtraction(extraction)).thenReturn(extraction);
         when(telegramService.sendMessageWithButtons(eq("42"), anyString(), anyList())).thenReturn(99L);
@@ -63,7 +63,7 @@ class TelegramIngestionWorkerTest {
                 aiService, telegramService, ingestionService, store, true);
         String raw = "{\"counterpartyName\":\"ACME\",\"amount\":20,\"lineItems\":[]}";
         LedgerExtraction extraction = new LedgerExtraction("Factura", "ACME", "20-1", "a@b.com", "123",
-                new BigDecimal("20.00"), null, null, "nota", List.of());
+                new BigDecimal("20.00"), null, null, "nota", List.of(), null, null, null, null);
         when(aiService.rawLedgerResponseFromText("factura")).thenReturn(raw);
         when(aiService.parseLedgerExtraction(raw)).thenReturn(extraction);
         when(ingestionService.normalizeExtraction(extraction)).thenReturn(extraction);
@@ -94,5 +94,23 @@ class TelegramIngestionWorkerTest {
                 "[DEBUG] RECHAZADO: Claude extraction omitted a positive amount");
         verify(store).remove(7L);
         verify(telegramService, never()).sendMessageWithButtons(anyString(), anyString(), anyList());
+    }
+
+    @Test
+    void debugTextIncludesOrigenAndDestino() {
+        TelegramIngestionWorker debugWorker = new TelegramIngestionWorker(
+                aiService, telegramService, ingestionService, store, true);
+        String raw = "{\"originName\":\"Juan\",\"destinationName\":\"BIND\",\"amount\":20,\"lineItems\":[]}";
+        LedgerExtraction extraction = new LedgerExtraction(null, null, null, null, null,
+                new BigDecimal("20.00"), null, null, null, List.of(),
+                "Juan", "20-1", "BIND", "33-2");
+        when(aiService.rawLedgerResponseFromText("test")).thenReturn(raw);
+        when(aiService.parseLedgerExtraction(raw)).thenReturn(extraction);
+        when(ingestionService.normalizeExtraction(extraction)).thenReturn(extraction);
+
+        debugWorker.processText(7L, "42", "test");
+
+        verify(telegramService).sendMessage(eq("42"), argThat(msg ->
+                msg.contains("originName: Juan") && msg.contains("destinationName: BIND")));
     }
 }

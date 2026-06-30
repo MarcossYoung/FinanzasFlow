@@ -246,7 +246,8 @@ class TelegramWebhookControllerTest {
 
     private PendingLedger pendingWithExtraction() {
         LedgerExtraction extraction = new LedgerExtraction("Factura", "ACME", null, null, null,
-                new BigDecimal("123.45"), LocalDate.of(2026, 6, 24), null, null, List.of());
+                new BigDecimal("123.45"), LocalDate.of(2026, 6, 24), null, null, List.of(),
+                null, null, null, null);
         return new PendingLedger(7L, "42", 9L, 1L, extraction, Instant.now());
     }
 
