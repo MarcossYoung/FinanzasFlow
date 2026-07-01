@@ -5,6 +5,7 @@ import {
     Route,
     Routes,
     Navigate,
+    useLocation,
 } from 'react-router-dom';
 import {UserContext} from './UserProvider';
 import {InvoicesProvider} from './InvoicesContext';
@@ -12,6 +13,7 @@ import Loader from './loader';
 
 // Keep these static because they are wrappers/layouts used immediately
 import Sidebar from './components/sidebar';
+import MobileNav from './components/mobileNav';
 import ProtectedRoute from './components/protectedRoute';
 import RoleRoute, {defaultRouteFor} from './RoleRoute';
 import './css/styles.css';
@@ -31,12 +33,22 @@ const CostsManager = lazy(() => import('./views/CostsManager'));
 const Customers = lazy(() => import('./views/customers'));
 const PrivacyPolicy = lazy(() => import('./views/PrivacyPolicy'));
 
+function AuthenticatedMobileNav() {
+    const {user} = useContext(UserContext);
+    const location = useLocation();
+    const publicRoutes = ['/login', '/privacy-policy'];
+
+    if (!user || publicRoutes.includes(location.pathname)) return null;
+    return <MobileNav />;
+}
+
 function App() {
     const {user, setUser} = useContext(UserContext);
 
     return (
         <InvoicesProvider>
             <Router>
+                <AuthenticatedMobileNav />
                 <Suspense fallback={<Loader />}>
                     <Routes>
                         {/* Public Routes */}
