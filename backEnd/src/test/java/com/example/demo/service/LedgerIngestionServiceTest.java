@@ -8,6 +8,8 @@ import com.example.demo.model.Customer;
 import com.example.demo.model.LedgerDirection;
 import com.example.demo.model.LedgerRecordType;
 import com.example.demo.model.Costs;
+import com.example.demo.model.PaymentStatus;
+import com.example.demo.model.Status;
 import com.example.demo.model.Tenant;
 import com.example.demo.repository.CustomerRepo;
 import com.example.demo.repository.TenantRepo;
@@ -148,7 +150,8 @@ class LedgerIngestionServiceTest {
             saved.setId(42L);
             return saved;
         });
-        when(invoiceService.createForTenant(any(), eq(1L), eq(2L))).thenReturn(invoiceResponse(55L));
+        when(invoiceService.createForTenant(any(), eq(1L), eq(2L), eq(Status.CERRADO), eq(PaymentStatus.PAGADO)))
+                .thenReturn(invoiceResponse(55L));
 
         LedgerIngestionResult result = service.finalizeDirection(pending, 2L, LedgerDirection.COBRO);
 
@@ -157,6 +160,32 @@ class LedgerIngestionServiceTest {
         verify(customerRepo).save(customerCaptor.capture());
         assertEquals("Marcos Young", customerCaptor.getValue().getName());
         assertEquals("20-30000000-1", customerCaptor.getValue().getCuitDni());
+    }
+
+    @Test
+    void cobroInvoiceIsCreatedWithCerradoAndPagado() {
+        LedgerExtraction extraction = new LedgerExtraction(
+                "Transferencia", null, null, null, null,
+                new BigDecimal("1000.00"), null, null, null, List.of(),
+                "Marcos Young", "20-30000000-1", "Billetera BIND", "33-71854885-9");
+        PendingLedger pending = new PendingLedger(7L, "42", 9L, 1L, extraction, Instant.now());
+        Tenant tenant = new Tenant();
+        tenant.setId(1L);
+        when(customerRepo.findFirstByTenant_IdAndCuitDniIgnoreCase(any(), anyString())).thenReturn(Optional.empty());
+        when(customerRepo.findFirstByTenant_IdAndNameIgnoreCase(any(), anyString())).thenReturn(Optional.empty());
+        when(customerRepo.findFirstByTenant_IdAndEmailIgnoreCase(any(), anyString())).thenReturn(Optional.empty());
+        when(tenantRepo.findById(1L)).thenReturn(Optional.of(tenant));
+        when(customerRepo.save(any())).thenAnswer(invocation -> {
+            Customer saved = invocation.getArgument(0);
+            saved.setId(99L);
+            return saved;
+        });
+        when(invoiceService.createForTenant(any(), eq(1L), eq(2L), eq(Status.CERRADO), eq(PaymentStatus.PAGADO)))
+                .thenReturn(invoiceResponse(55L));
+
+        service.finalizeDirection(pending, 2L, LedgerDirection.COBRO);
+
+        verify(invoiceService).createForTenant(any(), eq(1L), eq(2L), eq(Status.CERRADO), eq(PaymentStatus.PAGADO));
     }
 
     @Test
@@ -190,6 +219,6 @@ class LedgerIngestionServiceTest {
     private InvoiceResponse invoiceResponse(Long id) {
         return new InvoiceResponse(
                 id, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, List.of());
+                null, null, null, null, null, null, null, null, null, null, List.of());
     }
 }
