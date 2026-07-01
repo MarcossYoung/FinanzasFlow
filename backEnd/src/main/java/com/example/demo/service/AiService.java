@@ -48,7 +48,15 @@ public class AiService {
             titulo (string o null), counterpartyName (string o null), cuitDni (string o null),
             email (string o null), phone (string o null), amount (numero o null, total del documento),
             issueDate (YYYY-MM-DD o null), dueDate (YYYY-MM-DD o null), description (string o null),
-            lineItems (array de objetos con description, quantity, unitPrice; [] si no hay detalle).
+            lineItems (array de objetos con description, quantity, unitPrice; [] si no hay detalle),
+            originName (string o null), originTaxId (string o null),
+            destinationName (string o null), destinationTaxId (string o null).
+            Para comprobantes de transferencia bancaria: extrae el nombre y CUIT/CBU del emisor
+            (Cuenta Origen / quien envia el dinero) en originName y originTaxId, y el nombre y
+            CUIT/CBU del receptor (Cuenta Destino) en destinationName y destinationTaxId.
+            En esos casos counterpartyName y cuitDni pueden quedar null.
+            Para facturas o documentos con una sola contraparte: usa counterpartyName y cuitDni
+            normalmente; deja originName, originTaxId, destinationName, destinationTaxId en null.
             No inventes importes, fechas, identidad ni contacto. Usa punto decimal y fechas ISO.
             """;
 
@@ -173,12 +181,18 @@ public class AiService {
                     dateField(map, "issueDate"),
                     dateField(map, "dueDate"),
                     stringField(map, "description"),
-                    lineItemsField(map)
+                    lineItemsField(map),
+                    stringField(map, "originName"),
+                    stringField(map, "originTaxId"),
+                    stringField(map, "destinationName"),
+                    stringField(map, "destinationTaxId")
             );
             if (extraction.amount() == null || extraction.amount().signum() <= 0) {
                 throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude extraction omitted a positive amount");
             }
-            if (isBlank(extraction.counterpartyName()) && isBlank(extraction.cuitDni()) && isBlank(extraction.email())) {
+            if (isBlank(extraction.counterpartyName()) && isBlank(extraction.cuitDni())
+                    && isBlank(extraction.email())
+                    && isBlank(extraction.originName()) && isBlank(extraction.originTaxId())) {
                 throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Claude extraction omitted counterparty identity");
             }
             return extraction;
@@ -248,21 +262,29 @@ public class AiService {
     }
 
     public LedgerExtraction parseLedgerText(String text) {
+        return parseLedgerExtraction(rawLedgerResponseFromText(text));
+    }
+
+    public String rawLedgerResponseFromText(String text) {
         if (text == null || text.isBlank()) {
             throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Ledger text is empty");
         }
-        return parseLedgerJson(postToAnthropic(textBody(
+        return postToAnthropic(textBody(
                 LEDGER_EXTRACTION_SYSTEM,
                 "Extrae los datos contables de este texto:\n" + text,
                 500
-        )));
+        ));
     }
 
     public LedgerExtraction parseLedgerMediaFromBytes(byte[] bytes, String mediaType, String caption) {
+        return parseLedgerExtraction(rawLedgerResponseFromMedia(bytes, mediaType, caption));
+    }
+
+    public String rawLedgerResponseFromMedia(byte[] bytes, String mediaType, String caption) {
         if (bytes == null || bytes.length == 0) {
             throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Ledger media is empty");
         }
-        return parseLedgerJson(callClaudeVision(
+        return callClaudeVision(
                 LEDGER_EXTRACTION_SYSTEM,
                 bytes,
                 mediaType,
@@ -270,7 +292,11 @@ public class AiService {
                         ? "Extrae los datos contables de este documento."
                         : "Contexto del usuario: " + caption,
                 500
-        ));
+        );
+    }
+
+    public LedgerExtraction parseLedgerExtraction(String raw) {
+        return parseLedgerJson(raw);
     }
 
     public String generateFinanceInsight(String from, String to) {

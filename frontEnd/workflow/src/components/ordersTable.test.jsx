@@ -22,7 +22,7 @@ beforeEach(() => {
 
 test('main editable list exposes manual creation and refreshes when it closes', async () => {
 	renderTable('GESTOR', {allowManualCreate: true});
-	const trigger = await screen.findByRole('button', {name: /agregar o corregir manualmente/i});
+	const trigger = await screen.findByRole('button', {name: /agregar nuevo/i});
 	fireEvent.click(trigger);
 	fireEvent.click(screen.getByRole('button', {name: /cerrar creacion/i}));
 	await waitFor(() => expect(axios.get).toHaveBeenCalledTimes(2));
@@ -34,7 +34,7 @@ test.each([
 ])('does not expose manual creation when the view or role is read-only', async (role, props) => {
 	renderTable(role, props);
 	await screen.findByText(/todav/i);
-	expect(screen.queryByRole('button', {name: /agregar o corregir manualmente/i})).not.toBeInTheDocument();
+	expect(screen.queryByRole('button', {name: /agregar nuevo/i})).not.toBeInTheDocument();
 });
 
 test('invoice cells include labels for the mobile card layout', async () => {

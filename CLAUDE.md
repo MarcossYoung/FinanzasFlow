@@ -24,7 +24,7 @@ tracked in `FinanzasFlow.md`.)
 | Routing | React Router DOM | 7.9.4 |
 | AI | Anthropic API (Claude) | - |
 
-External: Telegram bot (ledger ingestion via webhook), N8N webhook support,
+External: Telegram bot (ledger ingestion via webhook),
 Railway (deploy), Neon (DB).
 
 ## Project Structure

@@ -27,9 +27,7 @@ const InvoiceEdit = lazy(() => import('./views/invoiceEditForm'));
 const Profile = lazy(() => import('./views/profile'));
 const AdminPage = lazy(() => import('./views/adminPage'));
 const OperatorPage = lazy(() => import('./views/OperatorPage'));
-const InvoicesDueSoon = lazy(() => import('./views/invoicesDueSoon'));
 const InvoicesUnpaid = lazy(() => import('./views/invoicesUnpaid'));
-const InvoicesOverdue = lazy(() => import('./views/invoicesOverdue'));
 const Finances = lazy(() => import('./views/finances'));
 const CostsManager = lazy(() => import('./views/CostsManager'));
 const Customers = lazy(() => import('./views/customers'));
@@ -68,17 +66,6 @@ function App() {
                             }
                         >
                             <Route
-                                path='por-vencer'
-                                element={
-                                    <RoleRoute
-                                        user={user}
-                                        allowedRoles={['GESTOR', 'ADMIN']}
-                                    >
-                                        <InvoicesDueSoon user={user} />
-                                    </RoleRoute>
-                                }
-                            />
-                            <Route
                                 index
                                 element={
                                     <RoleRoute
@@ -97,17 +84,6 @@ function App() {
                                         allowedRoles={['GESTOR', 'ADMIN']}
                                     >
                                         <InvoicesUnpaid />
-                                    </RoleRoute>
-                                }
-                            />
-                            <Route
-                                path='vencidas'
-                                element={
-                                    <RoleRoute
-                                        user={user}
-                                        allowedRoles={['GESTOR', 'ADMIN']}
-                                    >
-                                        <InvoicesOverdue />
                                     </RoleRoute>
                                 }
                             />

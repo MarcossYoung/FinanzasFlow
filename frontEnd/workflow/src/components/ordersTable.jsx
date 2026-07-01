@@ -5,6 +5,7 @@ import {useNavigate} from 'react-router-dom';
 import {UserContext} from '../UserProvider';
 import {BASE_URL} from '../api/config';
 import InvoiceCreationModal from './invoiceCreationModal';
+import {statusLabel} from '../constants/invoiceStatus';
 
 const formatMoney = (value) =>
 	Number(value || 0).toLocaleString('es-AR', {
@@ -12,15 +13,6 @@ const formatMoney = (value) =>
 		currency: 'ARS',
 		maximumFractionDigits: 0,
 	});
-
-const STATUS_LABELS = {
-	CERRADO: 'Cobrada',
-	EN_GESTION: 'En gestión',
-	PROMETIO_PAGO: 'Prometió pago',
-	EN_DISPUTA: 'En disputa',
-	INCOBRABLE: 'Incobrable',
-	CONTACTADO: 'Contactado',
-};
 
 export default function InvoicesTable({endpoint, allowManualCreate = false}) {
 	const {user} = useContext(UserContext);
@@ -77,7 +69,7 @@ export default function InvoicesTable({endpoint, allowManualCreate = false}) {
 
 	const getRowClass = (status) => {
 		if (status === 'CERRADO') return 'row-entregado';
-		if (status === 'EN_DISPUTA' || status === 'INCOBRABLE') return 'row-atrasado';
+		if (status === 'CANCELADO' || status === 'EN_DISPUTA' || status === 'INCOBRABLE') return 'row-atrasado';
 		if (status === 'PROMETIO_PAGO') return 'row-terminado';
 		return 'row-produccion';
 	};
@@ -100,7 +92,7 @@ export default function InvoicesTable({endpoint, allowManualCreate = false}) {
 				/>
 				{canCreateManually && (
 					<button className='btn-pill manual-entry-action' onClick={() => setIsModalOpen(true)}>
-						<FaPlus size={12} /> Agregar o corregir manualmente
+						<FaPlus size={12} /> Agregar nuevo
 					</button>
 				)}
 			</div>
@@ -125,7 +117,7 @@ export default function InvoicesTable({endpoint, allowManualCreate = false}) {
 									<td data-label='Emision'>{invoice.startDate || '-'}</td>
 									<td data-label='Vencimiento'>{invoice.fechaEntrega || invoice.fechaEstimada || '-'}</td>
 									<td data-label='Estado'><span className={`status-badge status-${(invoice.workOrderStatus || 'EN_GESTION').toLowerCase().replace(/_/g, '-')}`}>
-										{STATUS_LABELS[invoice.workOrderStatus] ?? invoice.workOrderStatus ?? 'En gestión'}
+										{statusLabel(invoice.workOrderStatus)}
 									</span></td>
 									<td data-label='Saldo'>{formatMoney(Number(invoice.precio || 0) - Number(invoice.totalPaid || 0))}</td>
 									{canDelete && <td data-label='Acciones' onClick={(e) => e.stopPropagation()}>

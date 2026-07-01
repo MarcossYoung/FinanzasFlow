@@ -14,7 +14,12 @@ public record LedgerExtraction(
         LocalDate issueDate,
         LocalDate dueDate,
         String description,
-        List<LedgerLineItemExtraction> lineItems
+        List<LedgerLineItemExtraction> lineItems,
+        // Transfer documents: sender (origen) and recipient (destino)
+        String originName,
+        String originTaxId,
+        String destinationName,
+        String destinationTaxId
 ) {
     public LedgerExtraction {
         lineItems = lineItems == null ? List.of() : List.copyOf(lineItems);

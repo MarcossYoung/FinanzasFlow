@@ -1039,6 +1039,30 @@ main,
 	cursor: not-allowed;
 }
 
+/* Edit-form action row: Cancelar + Guardar side by side */
+.form-actions {
+	display: flex;
+	gap: 0.75rem;
+	align-items: stretch;
+	margin-top: 0.4rem;
+}
+
+.form-actions .submit-button {
+	margin-top: 0;
+	flex: 1;
+}
+
+.form-actions .btn-pill {
+	flex: 0 0 auto;
+}
+
+.field-hint {
+	display: block;
+	margin-top: 0.25rem;
+	color: #636e72;
+	font-size: 0.78rem;
+}
+
 /* Mensajes de Feedback */
 .error-text {
 	color: #d63031;
