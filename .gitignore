@@ -3,8 +3,3 @@ plans/
 
 # build output
 backEnd/target/
-
-# Secret / local config files — never commit these
-.sentryclirc
-sentry.properties.local
-*.env.local

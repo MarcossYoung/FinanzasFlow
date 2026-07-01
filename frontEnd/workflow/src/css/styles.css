@@ -161,6 +161,12 @@ textarea {
 	font-weight: 600;
 }
 
+.mobile-tabbar,
+.mobile-more-backdrop,
+.mobile-more-sheet {
+	display: none;
+}
+
 /* MAIN CONTENT - STRETCH TO FILL */
 main,
 .main-content,
@@ -1033,30 +1039,6 @@ main,
 	cursor: not-allowed;
 }
 
-/* Edit-form action row: Cancelar + Guardar side by side */
-.form-actions {
-	display: flex;
-	gap: 0.75rem;
-	align-items: stretch;
-	margin-top: 0.4rem;
-}
-
-.form-actions .submit-button {
-	margin-top: 0;
-	flex: 1;
-}
-
-.form-actions .btn-pill {
-	flex: 0 0 auto;
-}
-
-.field-hint {
-	display: block;
-	margin-top: 0.25rem;
-	color: #636e72;
-	font-size: 0.78rem;
-}
-
 /* Mensajes de Feedback */
 .error-text {
 	color: #d63031;
@@ -1673,6 +1655,29 @@ main,
 	font-size: 0.75rem;
 }
 
+.expense-pie-chart {
+	width: 100%;
+	text-align: center;
+}
+
+.expense-pie-chart-svg {
+	width: min(220px, 100%);
+	height: auto;
+	transform: rotate(-90deg);
+}
+
+.expense-pie-chart-legend {
+	margin-top: 20px;
+	text-align: left;
+	font-size: 0.8rem;
+}
+
+.expense-pie-chart-legend-row {
+	display: flex;
+	align-items: center;
+	margin-bottom: 5px;
+}
+
 .empty-state-text {
 	color: var(--color-text-light);
 	text-align: center;
@@ -2016,8 +2021,13 @@ main,
 	.sidebar {
 		display: none;
 	}
+	html,
 	body {
 		overflow: auto;
+		max-width: 100%;
+	}
+	body {
+		overflow-x: hidden;
 	}
 	main,
 	.main-content,
@@ -2027,13 +2037,240 @@ main,
 	.profile-wrapper,
 	.product-wrapper,
 	.dashboard-content {
-		padding: 1rem;
+		margin-left: 0 !important;
+		width: 100% !important;
+		padding: 1rem 1rem calc(5.5rem + env(safe-area-inset-bottom)) !important;
 		overflow: auto;
+	}
+	.mobile-tabbar {
+		position: fixed;
+		right: 0;
+		bottom: 0;
+		left: 0;
+		z-index: 1100;
+		display: flex;
+		align-items: stretch;
+		min-height: calc(64px + env(safe-area-inset-bottom));
+		padding: 0 0 env(safe-area-inset-bottom);
+		background: #000;
+		border-top: 1px solid rgba(255, 255, 255, 0.1);
+		box-shadow: 0 -8px 22px rgba(0, 0, 0, 0.18);
+	}
+	.mobile-tab {
+		flex: 1 1 0;
+		min-width: 0;
+		min-height: 64px;
+		padding: 0.45rem 0.25rem;
+		border: 0;
+		border-top: 3px solid transparent;
+		background: transparent;
+		color: rgba(255, 255, 255, 0.62);
+		cursor: pointer;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.28rem;
+		font-size: 0.68rem;
+		font-weight: 700;
+		line-height: 1.1;
+		text-align: center;
+	}
+	.mobile-tab svg {
+		flex: 0 0 auto;
+		font-size: 1.05rem;
+	}
+	.mobile-tab span {
+		display: block;
+		max-width: 100%;
+		overflow-wrap: anywhere;
+	}
+	.mobile-tab.active {
+		color: var(--color-primary);
+		border-top-color: var(--color-primary);
+		background: rgba(0, 184, 148, 0.12);
+	}
+	.mobile-more-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 1090;
+		display: block;
+		border: 0;
+		background: rgba(0, 0, 0, 0.24);
+	}
+	.mobile-more-sheet {
+		position: fixed;
+		right: 0.75rem;
+		bottom: calc(72px + env(safe-area-inset-bottom));
+		left: 0.75rem;
+		z-index: 1101;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		padding: 0.5rem;
+		border-radius: var(--radius-md);
+		background: var(--color-surface);
+		box-shadow: 0 14px 34px rgba(0, 0, 0, 0.25);
+	}
+	.mobile-more-link {
+		min-height: 48px;
+		padding: 0.75rem 0.85rem;
+		border-radius: var(--radius-sm);
+		color: var(--color-text);
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		font-weight: 700;
+	}
+	.mobile-more-link.active {
+		background: rgba(0, 184, 148, 0.12);
+		color: var(--color-primary-dark);
+	}
+	.mobile-more-link svg {
+		color: var(--color-primary);
+	}
+	.table-wrapper,
+	.orders-table-wrapper,
+	.customers-table-wrapper,
+	.operator-action-table-wrapper {
+		max-width: 100%;
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+	.mobile-card-table {
+		min-width: 0;
+		border-collapse: separate;
+	}
+	.mobile-card-table thead {
+		display: none;
+	}
+	.mobile-card-table tbody,
+	.mobile-card-table tr,
+	.mobile-card-table td {
+		display: block;
+		width: 100%;
+	}
+	.mobile-card-table tr {
+		margin-bottom: 0.85rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		overflow: hidden;
+		box-shadow: var(--shadow-sm);
+	}
+	.mobile-card-table td {
+		min-height: 44px;
+		padding: 0.75rem 0.85rem;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1rem;
+		text-align: right;
+	}
+	.mobile-card-table td:last-child {
+		border-bottom: 0;
+	}
+	.mobile-card-table td::before {
+		content: attr(data-label);
+		color: var(--color-text-muted);
+		font-size: 0.76rem;
+		font-weight: 800;
+		text-align: left;
+		text-transform: uppercase;
+	}
+	.mobile-card-table td.truncate {
+		white-space: normal;
 	}
 	.orders-table th,
 	.orders-table td {
 		padding: 0.6rem 0.5rem;
 		font-size: 0.85rem;
+	}
+	.admin-tools,
+	.finance-actions,
+	.costs-controls,
+	.pagination-container,
+	.pagination-controls,
+	.admin-users-header,
+	.operator-title-row,
+	.operator-form-header,
+	.operator-card-actions,
+	.invoice-payment-form {
+		align-items: stretch;
+		flex-direction: column;
+	}
+	.admin-tools input,
+	.admin-tools .btn-pill,
+	.finance-actions .btn-pill,
+	.finance-actions .filter-input,
+	.costs-controls .filter-input,
+	.pagination-container .btn-pagination,
+	.pagination-controls .btn-pagination,
+	.admin-users-header .button_3,
+	.admin-telegram-actions,
+	.operator-icon-button,
+	.operator-card-actions button,
+	.invoice-payment-form .btn-pill {
+		width: 100%;
+		justify-content: center;
+	}
+	button,
+	.btn-pill,
+	.btn-pagination,
+	.btn-delete,
+	.button-red-icon,
+	.button-green,
+	.button_3,
+	.submit-button,
+	.icon-action {
+		min-height: 44px;
+	}
+	input,
+	select,
+	textarea {
+		font-size: 16px !important;
+		max-width: 100%;
+	}
+	.modal-overlay {
+		align-items: flex-start;
+		padding: max(1rem, env(safe-area-inset-top)) 0.75rem calc(1rem + env(safe-area-inset-bottom));
+		overflow-y: auto;
+	}
+	.modal-content {
+		width: 100%;
+		max-width: none;
+		max-height: 90vh;
+		padding: 1.25rem;
+	}
+	.modal-content .button_3,
+	.modal-content .submit-button,
+	.modal-content .button-green,
+	.modal-content .btn-pill {
+		width: 100%;
+		justify-content: center;
+	}
+	.page-header,
+	.finance-header,
+	.costs-header-row {
+		align-items: stretch;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+	.finance-chart-grid,
+	.finance-report-kpis,
+	.finance-report-charts,
+	.customers-layout {
+		grid-template-columns: 1fr;
+	}
+	.costs-form-row,
+	.operator-metric-grid {
+		grid-template-columns: 1fr;
+	}
+	.admin-chart-container {
+		min-height: 220px;
+	}
+	.expense-pie-chart-svg {
+		width: min(200px, 100%);
 	}
 	.dashboard-content nav {
 		flex-wrap: wrap;

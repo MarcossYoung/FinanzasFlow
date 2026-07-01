@@ -24,6 +24,7 @@ The project is in the middle of a domain cleanup from the old furniture workflow
 | Frontend | React 19 / Create React App |
 | Charts | Recharts |
 | AI | Anthropic API |
+| Automation | N8N webhook support |
 
 ## Project Layout
 
@@ -103,6 +104,7 @@ ANTHROPIC_API_KEY=<optional>
 CLOUDINARY_CLOUD_NAME=<optional>
 CLOUDINARY_API_KEY=<optional>
 CLOUDINARY_API_SECRET=<optional>
+N8N_WEBHOOK_PRODUCT_CREATED=<optional>
 TELEGRAM_BOT_TOKEN=<optional>
 TELEGRAM_ADMIN_CHAT_IDS=<optional comma-separated Telegram chat IDs>
 TELEGRAM_REMINDERS_CRON=<optional, default 0 0 9 * * *>

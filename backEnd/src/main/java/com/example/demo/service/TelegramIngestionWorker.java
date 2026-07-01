@@ -2,11 +2,9 @@ package com.example.demo.service;
 
 import com.example.demo.dto.LedgerExtraction;
 import com.example.demo.dto.LedgerIngestionResult;
-import com.example.demo.dto.LedgerLineItemExtraction;
 import com.example.demo.exceptions.AiServiceException;
 import com.example.demo.exceptions.TelegramApiException;
 import com.example.demo.service.ingestion.PendingLedgerStore;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -27,33 +25,22 @@ public class TelegramIngestionWorker {
     private final TelegramService telegramService;
     private final LedgerIngestionService ingestionService;
     private final PendingLedgerStore store;
-    private final boolean debugEcho;
 
     public TelegramIngestionWorker(AiService aiService,
                                    TelegramService telegramService,
                                    LedgerIngestionService ingestionService,
-                                   PendingLedgerStore store,
-                                   @Value("${telegram.ingestion.debug-echo:false}") boolean debugEcho) {
+                                   PendingLedgerStore store) {
         this.aiService = aiService;
         this.telegramService = telegramService;
         this.ingestionService = ingestionService;
         this.store = store;
-        this.debugEcho = debugEcho;
     }
 
     public void processText(long token, String chatId, String text) {
-        if (debugEcho) {
-            processDebug(token, chatId, () -> aiService.rawLedgerResponseFromText(text));
-            return;
-        }
         process(token, chatId, () -> aiService.parseLedgerText(text));
     }
 
     public void processMedia(long token, String chatId, String fileId, String mediaType, String caption) {
-        if (debugEcho) {
-            processMediaDebug(token, chatId, fileId, mediaType, caption);
-            return;
-        }
         process(token, chatId, () -> {
             if (!ALLOWED_MEDIA.contains(mediaType)) {
                 throw new IllegalArgumentException("Formato no soportado");
@@ -100,62 +87,6 @@ public class TelegramIngestionWorker {
         }
     }
 
-    private void processDebug(long token, String chatId, RawExtractionCall call) {
-        try {
-            String raw = call.extractRaw();
-            telegramService.sendMessage(chatId, "[DEBUG] RAW IA:\n" + truncate(raw));
-            try {
-                LedgerExtraction extraction = aiService.parseLedgerExtraction(raw);
-                LedgerExtraction normalized = ingestionService.normalizeExtraction(extraction);
-                store.attachExtraction(token, normalized);
-                String callbackPrefix = "ledger:" + token + ":";
-                telegramService.sendMessage(chatId, debugText(normalized));
-                telegramService.sendMessageWithButtons(
-                        chatId,
-                        pendingText(normalized),
-                        List.of(
-                                new TelegramService.InlineButton("Cobro (factura)", callbackPrefix + "COBRO"),
-                                new TelegramService.InlineButton("Gasto (proveedor)", callbackPrefix + "GASTO")
-                        )
-                );
-            } catch (AiServiceException | IllegalArgumentException e) {
-                store.remove(token);
-                telegramService.sendMessage(chatId, "[DEBUG] RECHAZADO: " + safeMessage(e));
-            }
-        } catch (AiServiceException e) {
-            store.remove(token);
-            telegramService.sendMessage(chatId, "[DEBUG] ERROR IA: " + safeMessage(e));
-        } catch (Exception e) {
-            store.remove(token);
-            telegramService.sendMessage(chatId, "La carga automatica no esta disponible temporalmente.");
-        }
-    }
-
-    private void processMediaDebug(long token, String chatId, String fileId, String mediaType, String caption) {
-        try {
-            if (!ALLOWED_MEDIA.contains(mediaType)) {
-                throw new IllegalArgumentException("Formato no soportado");
-            }
-            TelegramService.TelegramFile file = telegramService.getFile(fileId);
-            byte[] bytes = telegramService.downloadFile(file.path());
-            processDebug(token, chatId, () -> aiService.rawLedgerResponseFromMedia(bytes, mediaType, caption));
-        } catch (TelegramApiException e) {
-            store.remove(token);
-            if (e.getReason() == TelegramApiException.Reason.TOO_LARGE) {
-                telegramService.sendMessage(chatId, "El archivo es demasiado grande. Envia uno de menor tamano.");
-            } else if (e.getReason() == TelegramApiException.Reason.DOWNLOAD
-                    || e.getReason() == TelegramApiException.Reason.METADATA) {
-                telegramService.sendMessage(chatId, "No pude descargar el archivo. Reenvialo e intenta nuevamente.");
-            }
-        } catch (IllegalArgumentException e) {
-            store.remove(token);
-            telegramService.sendMessage(chatId, READ_FAILURE_MESSAGE);
-        } catch (Exception e) {
-            store.remove(token);
-            telegramService.sendMessage(chatId, "La carga automatica no esta disponible temporalmente.");
-        }
-    }
-
     public String completedText(LedgerIngestionResult result) {
         if (result == null) {
             return "Guardado. Si algun dato esta mal, editalo desde el panel.";
@@ -192,62 +123,8 @@ public class TelegramIngestionWorker {
         return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP).toPlainString();
     }
 
-    private String debugText(LedgerExtraction extraction) {
-        StringBuilder sb = new StringBuilder("[DEBUG] PARSEADO:\n");
-        sb.append("titulo: ").append(value(extraction.titulo())).append("\n");
-        sb.append("counterpartyName: ").append(value(extraction.counterpartyName())).append("\n");
-        sb.append("cuitDni: ").append(value(extraction.cuitDni())).append("\n");
-        sb.append("email: ").append(value(extraction.email())).append("\n");
-        sb.append("phone: ").append(value(extraction.phone())).append("\n");
-        sb.append("amount: ").append(value(extraction.amount())).append("\n");
-        sb.append("issueDate: ").append(value(extraction.issueDate())).append("\n");
-        sb.append("dueDate: ").append(value(extraction.dueDate())).append("\n");
-        sb.append("description: ").append(value(extraction.description())).append("\n");
-        sb.append("lineItems:");
-        List<LedgerLineItemExtraction> rows = extraction.lineItems() == null ? List.of() : extraction.lineItems();
-        if (rows.isEmpty()) {
-            sb.append(" []");
-        } else {
-            for (LedgerLineItemExtraction row : rows) {
-                sb.append("\n- ")
-                        .append(value(row.description()))
-                        .append(" / qty=")
-                        .append(value(row.quantity()))
-                        .append(" / unitPrice=")
-                        .append(value(row.unitPrice()));
-            }
-        }
-        sb.append("\noriginName: ").append(value(extraction.originName()));
-        sb.append("\noriginTaxId: ").append(value(extraction.originTaxId()));
-        sb.append("\ndestinationName: ").append(value(extraction.destinationName()));
-        sb.append("\ndestinationTaxId: ").append(value(extraction.destinationTaxId()));
-        return truncate(sb.toString());
-    }
-
-    private String truncate(String value) {
-        if (value == null) return "";
-        int max = 3900;
-        if (value.length() <= max) return value;
-        return value.substring(0, max) + "\n...[truncado]";
-    }
-
-    private String value(Object value) {
-        return value == null ? "null" : String.valueOf(value);
-    }
-
-    private String safeMessage(Exception e) {
-        return e.getMessage() == null || e.getMessage().isBlank()
-                ? e.getClass().getSimpleName()
-                : e.getMessage();
-    }
-
     @FunctionalInterface
     private interface ExtractionCall {
         LedgerExtraction extract();
-    }
-
-    @FunctionalInterface
-    private interface RawExtractionCall {
-        String extractRaw();
     }
 }

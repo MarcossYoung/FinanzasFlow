@@ -13,10 +13,14 @@ import com.example.demo.repository.InvoiceRepo;
 import com.example.demo.repository.TenantRepo;
 import com.example.demo.repository.UserRepo;
 import com.example.demo.repository.WorkOrderRepo;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -24,6 +28,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoField;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,7 +41,11 @@ public class InvoiceService {
     private final CustomerRepo customerRepo;
     private final TenantRepo tenantRepo;
     private final UserRepo userRepo;
+    private final RestTemplate restTemplate;
     private final ActivityLogService activityLogService;
+
+    @Value("${n8n.webhook.product-created:}")
+    private String n8nWebhookUrl;
 
     public InvoiceService(InvoiceRepo InvoiceRepo,
                           WorkOrderRepo workOrderRepo,
@@ -45,6 +54,7 @@ public class InvoiceService {
                           CustomerRepo customerRepo,
                           TenantRepo tenantRepo,
                           UserRepo userRepo,
+                          RestTemplate restTemplate,
                           ActivityLogService activityLogService) {
         this.InvoiceRepo = InvoiceRepo;
         this.workOrderRepo = workOrderRepo;
@@ -53,6 +63,7 @@ public class InvoiceService {
         this.customerRepo = customerRepo;
         this.tenantRepo = tenantRepo;
         this.userRepo = userRepo;
+        this.restTemplate = restTemplate;
         this.activityLogService = activityLogService;
     }
 
@@ -64,7 +75,7 @@ public class InvoiceService {
         if (owner == null || owner.getTenant() == null) {
             throw new IllegalStateException("Authenticated tenant owner is required");
         }
-        return createInternal(req, owner.getTenant(), owner, Status.EN_GESTION, null);
+        return createInternal(req, owner.getTenant(), owner);
     }
 
     @Transactional
@@ -73,21 +84,10 @@ public class InvoiceService {
                 .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
         AppUser owner = userRepo.findByIdAndTenant_Id(ownerId, tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("Owner does not belong to tenant"));
-        return createInternal(req, tenant, owner, Status.EN_GESTION, null);
+        return createInternal(req, tenant, owner);
     }
 
-    @Transactional
-    public InvoiceResponse createForTenant(InvoiceCreateRequest req, Long tenantId, Long ownerId,
-                                           Status initialWorkOrderStatus, PaymentStatus initialPaymentStatus) {
-        Tenant tenant = tenantRepo.findById(tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
-        AppUser owner = userRepo.findByIdAndTenant_Id(ownerId, tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("Owner does not belong to tenant"));
-        return createInternal(req, tenant, owner, initialWorkOrderStatus, initialPaymentStatus);
-    }
-
-    private InvoiceResponse createInternal(InvoiceCreateRequest req, Tenant tenant, AppUser owner,
-                                           Status initialWorkOrderStatus, PaymentStatus initialPaymentStatus) {
+    private InvoiceResponse createInternal(InvoiceCreateRequest req, Tenant tenant, AppUser owner) {
         Invoice p = new Invoice();
 
         p.setTitulo(req.titulo());
@@ -109,16 +109,13 @@ public class InvoiceService {
         p.setClientPhone(req.clientPhone());
         replaceLineItems(p, req.lineItems());
         p.setPrecio(resolveInvoiceTotal(req.precio(), p));
-        if (initialPaymentStatus != null) {
-            p.setPagoStatus(initialPaymentStatus);
-        }
 
         Invoice saved = InvoiceRepo.save(p);
 
         //WorkOrder Creation
         WorkOrder wo = new WorkOrder();
         wo.setInvoice(saved);
-        wo.setStatus(initialWorkOrderStatus != null ? initialWorkOrderStatus : Status.EN_GESTION);
+        wo.setStatus(Status.EN_GESTION);
         wo.setUpdateAt(LocalDateTime.now());
 
         workOrderRepo.save(wo);
@@ -140,9 +137,40 @@ public class InvoiceService {
             orderPaymentsRepo.save(deposit);
         }
 
+        scheduleN8nWebhookAfterCommit(saved);
         activityLogService.record(tenant.getId(), ActivityLogService.INVOICE_CREATED, owner.getId());
 
         return InvoiceResponse.from(saved);
+    }
+
+    private void scheduleN8nWebhookAfterCommit(Invoice p) {
+        if (n8nWebhookUrl == null || n8nWebhookUrl.isBlank()) return;
+        Map<String, Object> payload = Map.of(
+                "invoiceId", p.getId(),
+                "titulo", p.getTitulo() != null ? p.getTitulo() : "",
+                "clientPhone", p.getClientPhone() != null ? p.getClientPhone() : "",
+                "precio", p.getPrecio(),
+                "startDate", p.getStartDate().toString(),
+                "fechaEstimada", p.getFechaEstimada() != null ? p.getFechaEstimada().toString() : ""
+        );
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            fireN8nWebhook(payload);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                fireN8nWebhook(payload);
+            }
+        });
+    }
+
+    private void fireN8nWebhook(Map<String, Object> payload) {
+        try {
+            restTemplate.postForObject(n8nWebhookUrl, payload, String.class);
+        } catch (Exception e) {
+            // log but don't fail Invoice creation
+        }
     }
 
     // ---------------- READ (unchanged) ----------------

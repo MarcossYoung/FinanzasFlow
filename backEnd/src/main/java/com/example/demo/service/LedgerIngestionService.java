@@ -52,10 +52,8 @@ public class LedgerIngestionService {
         LedgerRecordType recordType;
         Long recordId;
         if (direction == LedgerDirection.COBRO) {
-            Customer customer = resolveOrCreateCustomerForCobro(extraction, pending.tenantId());
-            InvoiceResponse invoice = invoiceService.createForTenant(
-                    toInvoiceRequest(extraction, customer), pending.tenantId(), ownerId,
-                    Status.CERRADO, PaymentStatus.PAGADO);
+            Customer customer = resolveOrCreateCustomer(extraction, pending.tenantId());
+            InvoiceResponse invoice = invoiceService.createForTenant(toInvoiceRequest(extraction, customer), pending.tenantId(), ownerId);
             recordType = LedgerRecordType.INVOICE;
             recordId = invoice.id();
         } else {
@@ -72,18 +70,6 @@ public class LedgerIngestionService {
         normalizeExtraction(extraction);
     }
 
-    public String previewDirection(PendingLedger pending, LedgerDirection direction) {
-        if (pending == null) {
-            throw new IllegalArgumentException("Ingestion not found");
-        }
-        LedgerExtraction extraction = normalizeExtraction(pending.extraction());
-        if (direction == LedgerDirection.COBRO) {
-            Customer customer = resolveOrCreateCustomerForCobro(extraction);
-            return toInvoiceRequest(extraction, customer).toString();
-        }
-        return toCostRequest(extraction).toString();
-    }
-
     public LedgerExtraction normalizeExtraction(LedgerExtraction extraction) {
         if (extraction == null || extraction.amount() == null || extraction.amount().signum() <= 0) {
             throw new IllegalArgumentException("El total debe ser positivo");
@@ -95,12 +81,7 @@ public class LedgerIngestionService {
         String email = trimToLength(extraction.email(), MAX_EMAIL_LENGTH);
         String phone = trimToLength(extraction.phone(), MAX_PHONE_LENGTH);
         String description = trimToLength(extraction.description(), MAX_DESCRIPTION_LENGTH);
-        String originName = trimToLength(extraction.originName(), MAX_NAME_LENGTH);
-        String originTaxId = trimToLength(extraction.originTaxId(), MAX_CUIT_LENGTH);
-        String destinationName = trimToLength(extraction.destinationName(), MAX_NAME_LENGTH);
-        String destinationTaxId = trimToLength(extraction.destinationTaxId(), MAX_CUIT_LENGTH);
-        if (isBlank(counterpartyName) && isBlank(cuitDni) && isBlank(email)
-                && isBlank(originName) && isBlank(originTaxId)) {
+        if (isBlank(counterpartyName) && isBlank(cuitDni) && isBlank(email)) {
             throw new IllegalArgumentException("Falta identificar al cliente o proveedor");
         }
         List<LedgerLineItemExtraction> rows = normalizeLineItems(extraction.lineItems());
@@ -113,8 +94,7 @@ public class LedgerIngestionService {
         }
         return new LedgerExtraction(
                 title, counterpartyName, cuitDni, email, phone, amount,
-                extraction.issueDate(), extraction.dueDate(), description, rows,
-                originName, originTaxId, destinationName, destinationTaxId);
+                extraction.issueDate(), extraction.dueDate(), description, rows);
     }
 
     private List<LedgerLineItemExtraction> normalizeLineItems(List<LedgerLineItemExtraction> rows) {
@@ -173,49 +153,6 @@ public class LedgerIngestionService {
         return customerRepo.save(customer);
     }
 
-    private Customer resolveOrCreateCustomerForCobro(LedgerExtraction extraction) {
-        Customer customer = new Customer();
-        customer.setName(firstMeaningful(extraction.originName(), extraction.counterpartyName(),
-                extraction.originTaxId(), extraction.cuitDni(), extraction.email()));
-        customer.setCuitDni(trimToNull(firstMeaningful(extraction.originTaxId(), extraction.cuitDni())));
-        customer.setEmail(trimToNull(extraction.email()));
-        customer.setPhone(trimToNull(extraction.phone()));
-        return customer;
-    }
-
-    private Customer resolveOrCreateCustomerForCobro(LedgerExtraction extraction, Long tenantId) {
-        Optional<Customer> match = Optional.empty();
-        if (!isBlank(extraction.originTaxId())) {
-            match = customerRepo.findFirstByTenant_IdAndCuitDniIgnoreCase(tenantId, extraction.originTaxId().trim());
-        }
-        if (match.isEmpty() && !isBlank(extraction.originName())) {
-            match = customerRepo.findFirstByTenant_IdAndNameIgnoreCase(tenantId, extraction.originName().trim());
-        }
-        if (match.isEmpty() && !isBlank(extraction.cuitDni())) {
-            match = customerRepo.findFirstByTenant_IdAndCuitDniIgnoreCase(tenantId, extraction.cuitDni().trim());
-        }
-        if (match.isEmpty() && !isBlank(extraction.email())) {
-            match = customerRepo.findFirstByTenant_IdAndEmailIgnoreCase(tenantId, extraction.email().trim());
-        }
-        if (match.isEmpty() && !isBlank(extraction.counterpartyName())) {
-            match = customerRepo.findFirstByTenant_IdAndNameIgnoreCase(tenantId, extraction.counterpartyName().trim());
-        }
-        if (match.isPresent()) return match.get();
-
-        Tenant tenant = tenantRepo.findById(tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
-        Customer customer = new Customer();
-        customer.setTenant(tenant);
-        customer.setName(firstMeaningful(extraction.originName(), extraction.counterpartyName(),
-                extraction.originTaxId(), extraction.cuitDni(), extraction.email()));
-        customer.setCuitDni(trimToNull(firstMeaningful(extraction.originTaxId(), extraction.cuitDni())));
-        customer.setEmail(trimToNull(extraction.email()));
-        customer.setPhone(trimToNull(extraction.phone()));
-        customer.setPaymentScore(100);
-        customer.setCreatedAt(LocalDateTime.now());
-        return customerRepo.save(customer);
-    }
-
     private InvoiceCreateRequest toInvoiceRequest(LedgerExtraction extraction, Customer customer) {
         List<InvoiceLineItemRequest> lineItems = extraction.lineItems().stream()
                 .filter(row -> row != null && !isBlank(row.description()))
@@ -246,13 +183,9 @@ public class LedgerIngestionService {
         LocalDate date = direction == LedgerDirection.GASTO
                 ? (extraction.issueDate() != null ? extraction.issueDate() : LocalDate.now())
                 : extraction.dueDate();
-        String counterparty = direction == LedgerDirection.COBRO
-                ? firstMeaningful(extraction.originName(), extraction.originTaxId(),
-                        extraction.counterpartyName(), extraction.cuitDni(), extraction.email())
-                : firstMeaningful(extraction.counterpartyName(), extraction.cuitDni(), extraction.email());
         return new LedgerIngestionResult(
                 ingestionId, direction, recordType, recordId,
-                extraction.amount(), counterparty,
+                extraction.amount(), firstMeaningful(extraction.counterpartyName(), extraction.cuitDni(), extraction.email()),
                 date, alreadyCompleted
         );
     }

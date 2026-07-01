@@ -3,7 +3,6 @@ package com.example.demo.controller;
 import com.example.demo.model.LedgerDirection;
 import com.example.demo.model.LedgerRecordType;
 import com.example.demo.model.AppUser;
-import com.example.demo.dto.LedgerExtraction;
 import com.example.demo.dto.LedgerIngestionResult;
 import com.example.demo.model.TelegramConnection;
 import com.example.demo.model.Tenant;
@@ -149,28 +148,6 @@ class TelegramWebhookControllerTest {
     }
 
     @Test
-    void callbackWithBrokenConnectionSendsErrorMessageAndDoesNotFinalize() {
-        TelegramConnection brokenConn = mock(TelegramConnection.class);
-        when(brokenConn.getTenant()).thenThrow(new RuntimeException("simulated lazy failure"));
-        PendingLedger pending = pending();
-        when(pendingLedgerStore.get(7L)).thenReturn(Optional.of(pending));
-        when(connectionService.resolveConnection("42")).thenReturn(Optional.of(brokenConn));
-        TelegramWebhookController controller = controller();
-        Map<String, Object> update = Map.of("callback_query", Map.of(
-                "id", "callback-1",
-                "from", Map.of("id", 99),
-                "message", Map.of("message_id", 70, "chat", Map.of("id", 42)),
-                "data", "ledger:7:COBRO"
-        ));
-
-        assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
-        verify(telegramService).sendMessage("42",
-                "No pude guardar el registro. Revisa el documento o intenta nuevamente.");
-        verify(pendingLedgerStore, never()).remove(anyLong());
-        verify(ingestionService, never()).finalizeDirection(any(PendingLedger.class), anyLong(), any());
-    }
-
-    @Test
     void callbackWithoutMessageIdStillFinalizesPendingIngestion() {
         PendingLedger pending = pending();
         LedgerIngestionResult result = new LedgerIngestionResult(
@@ -195,28 +172,6 @@ class TelegramWebhookControllerTest {
     }
 
     @Test
-    void debugModeEchoesPayloadAndDoesNotPersist() {
-        PendingLedger pending = pendingWithExtraction();
-        when(pendingLedgerStore.get(7L)).thenReturn(Optional.of(pending));
-        when(connectionService.resolveConnection("42")).thenReturn(Optional.of(connection(1L, 2L)));
-        when(ingestionService.previewDirection(pending, LedgerDirection.COBRO))
-                .thenReturn("InvoiceCreateRequest[titulo=Factura]");
-        TelegramWebhookController controller = controller(true);
-        Map<String, Object> update = Map.of("callback_query", Map.of(
-                "id", "callback-1",
-                "from", Map.of("id", 42),
-                "message", Map.of("chat", Map.of("id", 42)),
-                "data", "ledger:7:COBRO"
-        ));
-
-        assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
-        verify(ingestionService).previewDirection(pending, LedgerDirection.COBRO);
-        verify(ingestionService, never()).finalizeDirection(any(PendingLedger.class), anyLong(), any());
-        verify(pendingLedgerStore).remove(7L);
-        verify(telegramService).sendMessage(eq("42"), contains("[DEBUG] NO GUARDADO"));
-    }
-
-    @Test
     void connectCommandConsumesCodeBeforeConnectionGate() {
         TelegramWebhookController controller = controller();
         Map<String, Object> update = Map.of("message", Map.of(
@@ -231,24 +186,13 @@ class TelegramWebhookControllerTest {
     }
 
     private TelegramWebhookController controller() {
-        return controller(false);
-    }
-
-    private TelegramWebhookController controller(boolean debugEcho) {
         return new TelegramWebhookController(
                 customerRepo, reminderRepo, invoiceRepo, workOrderRepo, telegramService,
-                connectionService, ingestionService, worker, pendingLedgerStore, directExecutor, "secret", debugEcho);
+                connectionService, ingestionService, worker, pendingLedgerStore, directExecutor, "secret");
     }
 
     private PendingLedger pending() {
         return new PendingLedger(7L, "42", 9L, 1L, null, Instant.now());
-    }
-
-    private PendingLedger pendingWithExtraction() {
-        LedgerExtraction extraction = new LedgerExtraction("Factura", "ACME", null, null, null,
-                new BigDecimal("123.45"), LocalDate.of(2026, 6, 24), null, null, List.of(),
-                null, null, null, null);
-        return new PendingLedger(7L, "42", 9L, 1L, extraction, Instant.now());
     }
 
     private TelegramConnection connection(Long tenantId, Long ownerId) {

@@ -6,10 +6,10 @@ export default function ExpensePieChart({data}) {
 	if (total === 0) return <p>No hay gastos registrados.</p>;
 
 	return (
-		<div style={{textAlign: 'center'}}>
+		<div className='expense-pie-chart'>
 			<svg
 				viewBox='-1 -1 2 2'
-				style={{transform: 'rotate(-90deg)', width: '200px'}}
+				className='expense-pie-chart-svg'
 			>
 				{data.map((item, i) => {
 					const [startX, startY] = [
@@ -31,22 +31,9 @@ export default function ExpensePieChart({data}) {
 					);
 				})}
 			</svg>
-			<div
-				style={{
-					marginTop: '20px',
-					textAlign: 'left',
-					fontSize: '0.8rem',
-				}}
-			>
+			<div className='expense-pie-chart-legend'>
 				{data.map((item, i) => (
-					<div
-						key={i}
-						style={{
-							display: 'flex',
-							alignItems: 'center',
-							marginBottom: '5px',
-						}}
-					>
+					<div key={i} className='expense-pie-chart-legend-row'>
 						<div
 							style={{
 								width: '12px',

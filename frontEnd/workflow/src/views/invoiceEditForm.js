@@ -3,7 +3,6 @@ import {useNavigate, useParams} from 'react-router-dom';
 import axios from 'axios';
 import {BASE_URL} from '../api/config';
 import {UserContext} from '../UserProvider';
-import {INVOICE_STATUS_OPTIONS} from '../constants/invoiceStatus';
 
 export default function InvoiceEditForm() {
 	const {invoiceId} = useParams();
@@ -12,7 +11,6 @@ export default function InvoiceEditForm() {
 	const [customers, setCustomers] = useState([]);
 	const [invoice, setInvoice] = useState(null);
 	const [error, setError] = useState(null);
-	const [submitting, setSubmitting] = useState(false);
 
 	useEffect(() => {
 		const token = user?.token || localStorage.getItem('token');
@@ -105,38 +103,9 @@ export default function InvoiceEditForm() {
 		0,
 	) || 0;
 
-	// --- Validation -----------------------------------------------------------
-	const validate = () => {
-		if (!invoice.titulo?.trim()) return 'El título es obligatorio.';
-		const validItems = invoice.lineItems.filter((item) =>
-			item.description?.trim(),
-		);
-		if (validItems.length === 0)
-			return 'Agregá al menos un item con descripción.';
-		const hasNegative = validItems.some(
-			(item) =>
-				Number(item.quantity || 0) < 0 || Number(item.unitPrice || 0) < 0,
-		);
-		if (hasNegative)
-			return 'Las cantidades y precios no pueden ser negativos.';
-		if (
-			invoice.startDate &&
-			invoice.fechaEntrega &&
-			invoice.fechaEntrega < invoice.startDate
-		)
-			return 'La fecha de vencimiento no puede ser anterior a la de emisión.';
-		return null;
-	};
-
 	const handleSubmit = async (e) => {
 		e.preventDefault();
 		setError(null);
-		const validationError = validate();
-		if (validationError) {
-			setError(validationError);
-			return;
-		}
-		setSubmitting(true);
 		const token = user?.token || localStorage.getItem('token');
 		const payload = {
 			titulo: invoice.titulo,
@@ -166,8 +135,6 @@ export default function InvoiceEditForm() {
 		} catch (err) {
 			console.error(err);
 			setError('No se pudo guardar la factura.');
-		} finally {
-			setSubmitting(false);
 		}
 	};
 
@@ -180,7 +147,6 @@ export default function InvoiceEditForm() {
 				<h2>Editar Factura #{invoiceId}</h2>
 			</div>
 			<form onSubmit={handleSubmit} className='creation-form'>
-				<h3>Datos generales</h3>
 				<div className='input-row'>
 					<div className='input-group'>
 						<label>Titulo</label>
@@ -210,10 +176,10 @@ export default function InvoiceEditForm() {
 						<input type='number' name='cantidad' value={invoice.cantidad || 1} onChange={handleChange} required min='1' />
 					</div>
 					<div className='input-group'>
-						<label>Estado</label>
+						<label>Estado de gestion</label>
 						<select name='workOrderStatus' value={invoice.workOrderStatus || 'EN_GESTION'} onChange={handleChange}>
-							{INVOICE_STATUS_OPTIONS.map(({value, label}) => (
-								<option key={value} value={value}>{label}</option>
+							{['EN_GESTION', 'CONTACTADO', 'PROMETIO_PAGO', 'EN_DISPUTA', 'INCOBRABLE', 'CERRADO'].map((status) => (
+								<option key={status} value={status}>{status}</option>
 							))}
 						</select>
 					</div>
@@ -290,12 +256,10 @@ export default function InvoiceEditForm() {
 					</div>
 				</div>
 
-				<h3>Fechas</h3>
 				<div className='input-row'>
 					<div className='input-group'>
 						<label>Fecha Emisión</label>
 						<input type='date' name='startDate' value={invoice.startDate || ''} onChange={handleChange} disabled />
-						<small className='field-hint'>Se fija al crear la factura y no puede editarse.</small>
 					</div>
 					<div className='input-group'>
 						<label>Fecha Vencimiento</label>
@@ -308,20 +272,8 @@ export default function InvoiceEditForm() {
 					<textarea name='notas' value={invoice.notas || ''} onChange={handleChange} rows='3' />
 				</div>
 
+				<button type='submit' className='submit-button'>Guardar Cambios</button>
 				{error && <p className='error-text'>{error}</p>}
-				<div className='form-actions'>
-					<button
-						type='button'
-						className='btn-pill'
-						onClick={() => navigate(`/invoices/${invoiceId}`)}
-						disabled={submitting}
-					>
-						Cancelar
-					</button>
-					<button type='submit' className='submit-button' disabled={submitting}>
-						{submitting ? 'Guardando...' : 'Guardar Cambios'}
-					</button>
-				</div>
 			</form>
 		</div>
 	);

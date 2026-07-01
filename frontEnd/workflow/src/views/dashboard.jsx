@@ -43,6 +43,12 @@ export default function Dashboard() {
 							Facturas
 						</NavLink>
 					)}
+					<NavLink to='por-vencer' className={linkClass}>
+						Por vencer
+					</NavLink>
+					<NavLink to='vencidas' className={linkClass}>
+						Vencidas
+					</NavLink>
 					<NavLink to='no-cobradas' className={linkClass}>
 						Sin cobrar
 					</NavLink>
