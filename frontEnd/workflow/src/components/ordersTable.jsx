@@ -117,7 +117,7 @@ export default function InvoicesTable({endpoint, allowManualCreate = false}) {
 									<td data-label='Emision'>{invoice.startDate || '-'}</td>
 									<td data-label='Vencimiento'>{invoice.fechaEntrega || invoice.fechaEstimada || '-'}</td>
 									<td data-label='Estado' className='inv-status-cell'><span className={`status-badge status-${(invoice.workOrderStatus || 'EN_GESTION').toLowerCase().replace(/_/g, '-')}`}>
-										{STATUS_LABELS[invoice.workOrderStatus] ?? invoice.workOrderStatus ?? 'En gestión'}
+										{statusLabel(invoice.workOrderStatus)}
 									</span></td>
 									<td data-label='Saldo'>{formatMoney(Number(invoice.precio || 0) - Number(invoice.totalPaid || 0))}</td>
 									{canDelete && <td data-label='Acciones' onClick={(e) => e.stopPropagation()}>
