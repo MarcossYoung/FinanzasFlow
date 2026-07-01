@@ -111,6 +111,24 @@ class SecurityBoundaryTest {
 
         mockMvc.perform(get("/api/operator/tenants").header("Authorization", bearer(token)))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/operator/tenants/" + tenant.getId() + "/users")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", "blocked_by_admin_" + System.nanoTime(),
+                                "password", PASSWORD,
+                                "role", "GESTOR"
+                        ))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/users/registro")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", "legacy_admin_create_" + System.nanoTime(),
+                                "password", PASSWORD,
+                                "appUserRole", "GESTOR"
+                        ))))
+                .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/admin/users").header("Authorization", bearer(token)))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/costs").header("Authorization", bearer(token)))
@@ -146,6 +164,68 @@ class SecurityBoundaryTest {
                 .andExpect(jsonPath("$.userCount").value(1))
                 .andExpect(jsonPath("$.actionsThisMonth").value(0))
                 .andExpect(jsonPath("$.totalOwed").doesNotExist());
+    }
+
+    @Test
+    void superAdminCanCreateTenantUsersOnlyThroughOperatorFlow() throws Exception {
+        String token = login(SUPER_USERNAME);
+        String username = "operator_user_" + System.nanoTime();
+
+        mockMvc.perform(post("/api/operator/tenants/" + tenant.getId() + "/users")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", username,
+                                "password", PASSWORD,
+                                "role", "GESTOR"
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.username").value(username))
+                .andExpect(jsonPath("$.appUserRole").value("GESTOR"));
+
+        mockMvc.perform(post("/api/operator/tenants/" + tenant.getId() + "/users")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", username.toUpperCase(),
+                                "password", PASSWORD,
+                                "role", "GESTOR"
+                        ))))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(post("/api/operator/tenants/" + tenant.getId() + "/users")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", "bad_role_" + System.nanoTime(),
+                                "password", PASSWORD,
+                                "role", "SUPER_ADMIN"
+                        ))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void loginAcceptsUsernameCaseVariationsAndReturnsLowercaseIdentity() throws Exception {
+        ensureUser("case_login_user", AppUserRole.GESTOR, tenant);
+
+        String response = mockMvc.perform(post("/api/users/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", "CASE_LOGIN_USER",
+                                "password", PASSWORD
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("case_login_user"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        JsonNode json = objectMapper.readTree(response);
+        String token = json.get("token").asText();
+        String[] tokenParts = token.split("\\.");
+        String payload = new String(java.util.Base64.getUrlDecoder().decode(tokenParts[1]));
+        JsonNode payloadJson = objectMapper.readTree(payload);
+        org.assertj.core.api.Assertions.assertThat(payloadJson.get("sub").asText()).isEqualTo("case_login_user");
     }
 
     private void ensureUser(String username, AppUserRole role, Tenant userTenant) {

@@ -1,10 +1,13 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.CreateTenantRequest;
+import com.example.demo.dto.CreateTenantUserRequest;
 import com.example.demo.dto.SetTenantActiveRequest;
 import com.example.demo.dto.TenantActivityResponse;
 import com.example.demo.dto.TenantOperationalSummary;
 import com.example.demo.dto.UpdateTenantRequest;
+import com.example.demo.dto.UserSummaryDto;
+import com.example.demo.model.AppUser;
 import com.example.demo.model.AppUserRole;
 import com.example.demo.model.Tenant;
 import com.example.demo.repository.TenantActivityRepo;
@@ -98,6 +101,18 @@ public class TenantService {
         Tenant tenant = ensureTenant(tenantId);
         tenant.setActive(request.active());
         return summary(tenant.getId());
+    }
+
+    @Transactional
+    public UserSummaryDto addUserToTenant(Long tenantId, CreateTenantUserRequest request) {
+        Tenant tenant = ensureTenant(tenantId);
+        AppUser created = appUserService.createTenantUser(
+                tenant,
+                request.username(),
+                request.password(),
+                request.role()
+        );
+        return new UserSummaryDto(created.getId(), created.getUsername(), created.getAppUserRole().name());
     }
 
     @Transactional(readOnly = true)

@@ -246,7 +246,7 @@ export default function Customers() {
 					{success && <p className='success-text'>{success}</p>}
 
 					<div className='table-wrapper customers-table-wrapper'>
-						<table className='orders-table customers-table'>
+						<table className='orders-table customers-table mobile-card-table'>
 							<thead>
 								<tr>
 									<th>Cliente</th>
@@ -266,21 +266,21 @@ export default function Customers() {
 								) : filteredCustomers.length ? (
 									filteredCustomers.map((customer) => (
 										<tr key={customer.id}>
-											<td>
+											<td data-label='Cliente'>
 												<strong>{customer.name}</strong>
 												{customer.notes && <small>{customer.notes}</small>}
 											</td>
-											<td>
+											<td data-label='Contacto'>
 												<span>{customer.email || '-'}</span>
 												<small>{customer.phone || '-'}</small>
 											</td>
-											<td>{customer.cuitDni || '-'}</td>
-											<td>
+											<td data-label='CUIT / DNI'>{customer.cuitDni || '-'}</td>
+											<td data-label='Score'>
 												<span className='score-pill'>
 													{customer.paymentScore ?? 100}
 												</span>
 											</td>
-											<td>
+											<td data-label='Acciones'>
 												<div className='table-actions'>
 													<button
 														type='button'

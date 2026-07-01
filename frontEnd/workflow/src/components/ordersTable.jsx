@@ -101,7 +101,7 @@ export default function InvoicesTable({endpoint, allowManualCreate = false}) {
 				{loading ? (
 					<div className='orders-loading-state'>Cargando...</div>
 				) : (
-					<table className='orders-table mobile-card-table'>
+					<table className='orders-table invoices-strip-table'>
 						<thead><tr>
 							<th>Id</th><th>Título</th><th>Cliente</th><th>Cant.</th>
 							<th>Emisión</th><th>Vencimiento</th><th>Estado</th><th>Saldo</th>
@@ -110,14 +110,14 @@ export default function InvoicesTable({endpoint, allowManualCreate = false}) {
 						<tbody>
 							{displayedInvoices.length > 0 ? displayedInvoices.map((invoice) => (
 								<tr key={invoice.id} className={getRowClass(invoice.workOrderStatus)} onClick={() => navigate(`/invoices/${invoice.id}`)}>
-									<td data-label='Id'>{invoice.id}</td>
+									<td data-label='Id' className='inv-id-cell'>{invoice.id}</td>
 									<td data-label='Titulo' className='truncate'><strong>{invoice.titulo}</strong></td>
 									<td data-label='Cliente'>{invoice.customerName || '-'}</td>
 									<td data-label='Cant.'>{invoice.cantidad || '-'}</td>
 									<td data-label='Emision'>{invoice.startDate || '-'}</td>
 									<td data-label='Vencimiento'>{invoice.fechaEntrega || invoice.fechaEstimada || '-'}</td>
-									<td data-label='Estado'><span className={`status-badge status-${(invoice.workOrderStatus || 'EN_GESTION').toLowerCase().replace(/_/g, '-')}`}>
-										{statusLabel(invoice.workOrderStatus)}
+									<td data-label='Estado' className='inv-status-cell'><span className={`status-badge status-${(invoice.workOrderStatus || 'EN_GESTION').toLowerCase().replace(/_/g, '-')}`}>
+										{STATUS_LABELS[invoice.workOrderStatus] ?? invoice.workOrderStatus ?? 'En gestión'}
 									</span></td>
 									<td data-label='Saldo'>{formatMoney(Number(invoice.precio || 0) - Number(invoice.totalPaid || 0))}</td>
 									{canDelete && <td data-label='Acciones' onClick={(e) => e.stopPropagation()}>
