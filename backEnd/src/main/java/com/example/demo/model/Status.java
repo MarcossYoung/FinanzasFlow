@@ -6,5 +6,6 @@ public enum Status {
     PROMETIO_PAGO,
     EN_DISPUTA,
     INCOBRABLE,
-    CERRADO
+    CERRADO,
+    CANCELADO
 }

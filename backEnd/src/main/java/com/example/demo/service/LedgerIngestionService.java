@@ -53,7 +53,9 @@ public class LedgerIngestionService {
         Long recordId;
         if (direction == LedgerDirection.COBRO) {
             Customer customer = resolveOrCreateCustomerForCobro(extraction, pending.tenantId());
-            InvoiceResponse invoice = invoiceService.createForTenant(toInvoiceRequest(extraction, customer), pending.tenantId(), ownerId);
+            InvoiceResponse invoice = invoiceService.createForTenant(
+                    toInvoiceRequest(extraction, customer), pending.tenantId(), ownerId,
+                    Status.CERRADO, PaymentStatus.PAGADO);
             recordType = LedgerRecordType.INVOICE;
             recordId = invoice.id();
         } else {

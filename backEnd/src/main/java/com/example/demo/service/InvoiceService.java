@@ -64,7 +64,7 @@ public class InvoiceService {
         if (owner == null || owner.getTenant() == null) {
             throw new IllegalStateException("Authenticated tenant owner is required");
         }
-        return createInternal(req, owner.getTenant(), owner);
+        return createInternal(req, owner.getTenant(), owner, Status.EN_GESTION, null);
     }
 
     @Transactional
@@ -73,10 +73,21 @@ public class InvoiceService {
                 .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
         AppUser owner = userRepo.findByIdAndTenant_Id(ownerId, tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("Owner does not belong to tenant"));
-        return createInternal(req, tenant, owner);
+        return createInternal(req, tenant, owner, Status.EN_GESTION, null);
     }
 
-    private InvoiceResponse createInternal(InvoiceCreateRequest req, Tenant tenant, AppUser owner) {
+    @Transactional
+    public InvoiceResponse createForTenant(InvoiceCreateRequest req, Long tenantId, Long ownerId,
+                                           Status initialWorkOrderStatus, PaymentStatus initialPaymentStatus) {
+        Tenant tenant = tenantRepo.findById(tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
+        AppUser owner = userRepo.findByIdAndTenant_Id(ownerId, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("Owner does not belong to tenant"));
+        return createInternal(req, tenant, owner, initialWorkOrderStatus, initialPaymentStatus);
+    }
+
+    private InvoiceResponse createInternal(InvoiceCreateRequest req, Tenant tenant, AppUser owner,
+                                           Status initialWorkOrderStatus, PaymentStatus initialPaymentStatus) {
         Invoice p = new Invoice();
 
         p.setTitulo(req.titulo());
@@ -98,13 +109,16 @@ public class InvoiceService {
         p.setClientPhone(req.clientPhone());
         replaceLineItems(p, req.lineItems());
         p.setPrecio(resolveInvoiceTotal(req.precio(), p));
+        if (initialPaymentStatus != null) {
+            p.setPagoStatus(initialPaymentStatus);
+        }
 
         Invoice saved = InvoiceRepo.save(p);
 
         //WorkOrder Creation
         WorkOrder wo = new WorkOrder();
         wo.setInvoice(saved);
-        wo.setStatus(Status.EN_GESTION);
+        wo.setStatus(initialWorkOrderStatus != null ? initialWorkOrderStatus : Status.EN_GESTION);
         wo.setUpdateAt(LocalDateTime.now());
 
         workOrderRepo.save(wo);

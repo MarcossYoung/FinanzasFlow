@@ -2,6 +2,7 @@ package com.example.demo.dto;
 
 import com.example.demo.model.Invoice;
 import com.example.demo.model.Status;
+import com.example.demo.model.PaymentStatus;
 import com.example.demo.model.WorkOrder;
 import com.example.demo.model.OrderPayments;
 
@@ -23,6 +24,7 @@ public record InvoiceResponse(
         Long ownerId,
         Long workOrderId,
         Status workOrderStatus,
+        PaymentStatus pagoStatus,
         BigDecimal totalPaid,
         BigDecimal depositPaid,
         BigDecimal daysLate,
@@ -78,6 +80,7 @@ public record InvoiceResponse(
                 p.getOwner() != null ? p.getOwner().getId() : null,
                 wo != null ? wo.getId() : null,
                 wo != null ? wo.getStatus() : null,
+                p.getPagoStatus(),
                 totalPaid,
                 depositPaid,
                 daysLate,
