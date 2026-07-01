@@ -22,7 +22,7 @@ const Login = () => {
 		setUser(null);
 		try {
 			const payload = {
-				username: formData.username.trim(),
+				username: formData.username.trim().toLowerCase(),
 				password: formData.password,
 			};
 			const response = await axios.post(
@@ -67,6 +67,7 @@ const Login = () => {
 						onChange={handleChange}
 						required
 					/>
+					<small className='input-hint'>El usuario no distingue mayúsculas</small>
 
 					<label htmlFor='password'>Contraseña</label>
 					<input

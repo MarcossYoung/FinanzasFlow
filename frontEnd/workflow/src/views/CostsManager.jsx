@@ -239,11 +239,11 @@ export default function CostsManager() {
 				<div className='panel manual-entry-panel'>
 					<button
 						type='button'
-						className='manual-entry-disclosure'
+						className='button-green manual-entry-disclosure'
 						onClick={() => setShowManualForm((visible) => !visible)}
 						aria-expanded={showManualForm}
 					>
-						Agregar o corregir manualmente
+						Agregar
 					</button>
 					{showManualForm && <form onSubmit={handleSubmit} className='costs-form manual-entry-form'>
 						<div className='costs-form-row'>
@@ -293,7 +293,7 @@ export default function CostsManager() {
 			</div>
 
 			{/* Costs Table */}
-			<div className='panel costs-table-panel'>
+			<div className='panel costs-table-panel costs-table-mobile-hide'>
 				<div className='costs-table-header'>
 					<h3 className='card-section-title'>Gastos del Período</h3>
 				</div>

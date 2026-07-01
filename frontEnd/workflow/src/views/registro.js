@@ -14,7 +14,7 @@ const Register = () => {
 
 	const handleChange = (e) => {
 		const {name, value} = e.target;
-		setUserData({...userData, [name]: value});
+		setUserData({...userData, [name]: name === 'username' ? value.toLowerCase() : value});
 	};
 
 	const handleSubmit = async (e) => {

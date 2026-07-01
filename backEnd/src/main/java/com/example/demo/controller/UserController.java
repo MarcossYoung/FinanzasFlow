@@ -1,7 +1,6 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.UserSummaryDto;
-import com.example.demo.exceptions.UserAlreadyExistsException;
 import com.example.demo.model.AppUser;
 import com.example.demo.service.AppUserService;
 import org.slf4j.Logger;
@@ -12,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @RestController
@@ -44,7 +44,7 @@ public class UserController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AppUser user) {
-        String username = user.getUsername() == null ? "" : user.getUsername().trim();
+        String username = user.getUsername() == null ? "" : user.getUsername().trim().toLowerCase(Locale.ROOT);
         log.info("Login attempt for username='{}'", username);
         try {
             Map<String, Object> response = appUserService.loginUser(username, user.getPassword());

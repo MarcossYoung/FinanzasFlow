@@ -20,6 +20,6 @@ test('keeps reporting visible and reveals manual cost entry on demand', async ()
 	expect(screen.getByText('Distribución por Tipo')).toBeInTheDocument();
 	expect(screen.getByText('Gastos del Período')).toBeInTheDocument();
 	expect(screen.queryByPlaceholderText('0.00')).not.toBeInTheDocument();
-	fireEvent.click(screen.getByRole('button', {name: /agregar o corregir manualmente/i}));
+	fireEvent.click(screen.getByRole('button', {name: /agregar/i}));
 	expect(screen.getByPlaceholderText('0.00')).toBeInTheDocument();
 });

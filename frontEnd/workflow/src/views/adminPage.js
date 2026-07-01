@@ -6,7 +6,6 @@ import {
 	FaClock,
 	FaCheckCircle,
 	FaTrashAlt,
-	FaUserPlus,
 	FaEdit,
 	FaCheck,
 	FaTimes,
@@ -38,12 +37,6 @@ function AdminPage() {
 
 	// User Management States
 	const [users, setUsers] = useState([]);
-	const [showUserModal, setShowUserModal] = useState(false);
-	const [newUser, setNewUser] = useState({
-		username: '',
-		password: '',
-		appUserRole: 'GESTOR',
-	});
 	const [msg, setMsg] = useState({text: '', type: ''}); // Unified message state
 	const [editingUserId, setEditingUserId] = useState(null);
 	const [editingRole, setEditingRole] = useState('');
@@ -109,26 +102,6 @@ function AdminPage() {
 	}, []);
 
 	// --- HANDLERS ---
-	const handleCreateUser = async (e) => {
-		e.preventDefault();
-		try {
-			const token = localStorage.getItem('token');
-			await axios.post(`${BASE_URL}/api/users/registro`, newUser, {
-				headers: {Authorization: `Bearer ${token}`},
-			});
-
-			setMsg({text: 'Usuario creado con éxito', type: 'green'});
-			setNewUser({username: '', password: '', appUserRole: 'GESTOR'});
-			setShowUserModal(false);
-			fetchData(); // Recargar la lista
-
-			setTimeout(() => setMsg({text: '', type: ''}), 3000);
-		} catch (error) {
-			console.error('Error creando usuario:', error);
-			setMsg({text: 'Error al crear usuario', type: 'red'});
-		}
-	};
-
 	const handleEditRole = async (id) => {
 		try {
 			const token = localStorage.getItem('token');
@@ -358,7 +331,7 @@ function AdminPage() {
 					</div>
 
 					<div className='table-wrapper admin-users-table'>
-						<table className='orders-table'>
+						<table className='orders-table mobile-card-table'>
 							<thead>
 								<tr>
 									<th>Chat</th>
@@ -372,12 +345,12 @@ function AdminPage() {
 								{telegramConnections.length > 0 ? (
 									telegramConnections.map((conn) => (
 										<tr key={conn.id}>
-											<td>
+											<td data-label='Chat'>
 												<strong>{conn.chatTitle || conn.chatId}</strong>
 												<div className='admin-muted-text'>{conn.chatId}</div>
 											</td>
-											<td>{conn.chatType || 'private'}</td>
-											<td>
+											<td data-label='Tipo'>{conn.chatType || 'private'}</td>
+											<td data-label='Responsable'>
 												<select
 													value={conn.defaultOwnerId || ''}
 													onChange={(e) => handleUpdateTelegramOwner(conn.id, e.target.value)}
@@ -390,8 +363,8 @@ function AdminPage() {
 													))}
 												</select>
 											</td>
-											<td>{conn.createdAt ? new Date(conn.createdAt).toLocaleString() : '-'}</td>
-											<td className='text-center admin-user-actions'>
+											<td data-label='Conectado'>{conn.createdAt ? new Date(conn.createdAt).toLocaleString() : '-'}</td>
+											<td data-label='Acciones' className='text-center admin-user-actions'>
 												<button
 													className='btn-delete'
 													onClick={() => handleDisableTelegramConnection(conn.id)}
@@ -418,17 +391,11 @@ function AdminPage() {
 				</div>
 
 				{/* SECTION C: USER MANAGEMENT */}
-				<div className='costs-wrapper admin-section-panel'>
+				<div className='costs-wrapper admin-section-panel admin-users-section'>
 					<div
 						className='admin-users-header'
 					>
 						<h2>Gestión de Usuarios</h2>
-						<button
-							className='button_3'
-							onClick={() => setShowUserModal(true)}
-						>
-							<FaUserPlus /> Nuevo Usuario
-						</button>
 					</div>
 
 					{/* Feedback Messages */}
@@ -622,83 +589,6 @@ function AdminPage() {
 				</div>
 			)}
 
-			{/* MODAL CREAR USUARIO */}
-			{showUserModal && (
-				<div
-					className='modal-overlay'
-					onClick={() => setShowUserModal(false)}
-				>
-					<div
-						className='modal-content'
-						onClick={(e) => e.stopPropagation()}
-					>
-						<h2 className='admin-modal-title'>
-							Crear Nuevo Usuario
-						</h2>
-						<form
-							onSubmit={handleCreateUser}
-							className='form-input'
-						>
-							<div className='form-group'>
-								<label>Nombre de Usuario</label>
-								<input
-									type='text'
-									value={newUser.username}
-									onChange={(e) =>
-										setNewUser({
-											...newUser,
-											username: e.target.value,
-										})
-									}
-									required
-									autoFocus
-								/>
-							</div>
-							<div className='form-group'>
-								<label>Contraseña</label>
-								<input
-									type='password'
-									value={newUser.password}
-									onChange={(e) =>
-										setNewUser({
-											...newUser,
-											password: e.target.value,
-										})
-									}
-									required
-								/>
-							</div>
-							<div className='form-group'>
-								<label>Rol / Permisos</label>
-								<select
-									value={newUser.appUserRole}
-									onChange={(e) =>
-										setNewUser({
-											...newUser,
-											appUserRole: e.target.value,
-										})
-									}
-									className='admin-modal-role-select'
-								>
-									<option value='GESTOR'>
-										Gestor (Facturas y cobranzas)
-									</option>
-									<option value='ADMIN'>
-										Administrador (Todo)
-									</option>
-								</select>
-							</div>
-
-							<button
-								type='submit'
-								className='button_3 margin-5 admin-modal-submit'
-							>
-								Confirmar Creación
-							</button>
-						</form>
-					</div>
-				</div>
-			)}
 		</div>
 	);
 }

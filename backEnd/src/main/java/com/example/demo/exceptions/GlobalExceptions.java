@@ -32,6 +32,14 @@ public class GlobalExceptions {
         return new ResponseEntity<>(response, HttpStatus.CONFLICT);
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", ex.getMessage());
+        response.put("status", HttpStatus.BAD_REQUEST.value());
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(NoHandlerFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFoundError(NoHandlerFoundException e) {
         Map<String, Object> response = new HashMap<>();

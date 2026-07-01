@@ -5,6 +5,15 @@ import {BASE_URL} from '../api/config';
 import {UserContext} from '../UserProvider';
 import {INVOICE_STATUS_OPTIONS} from '../constants/invoiceStatus';
 
+const STATUS_LABELS = {
+	CERRADO: 'Cobrada',
+	EN_GESTION: 'En gestión',
+	PROMETIO_PAGO: 'Prometió pago',
+	EN_DISPUTA: 'En disputa',
+	INCOBRABLE: 'Incobrable',
+	CONTACTADO: 'Contactado',
+};
+
 const formatMoney = (value) =>
 	value === null || value === undefined || value === ''
 		? '-'
@@ -96,58 +105,75 @@ export default function InvoiceDetail() {
 
 	return (
 		<div className='invoice-detail-page'>
-			<div className='orders-header invoice-detail-header'>
-				<div>
+
+			{/* Hero */}
+			<div className='invoice-hero'>
+				<div className='invoice-hero-left'>
 					<h1 className='main-title'>Factura #{invoiceId}</h1>
-					<p className='invoice-detail-subtitle'>{invoice.titulo}</p>
+					{invoice.titulo && <p className='invoice-detail-subtitle'>{invoice.titulo}</p>}
 				</div>
-				{canEdit && (
-					<button
-						className='btn-pill'
-						onClick={() => navigate(`/invoices/${invoiceId}/edit`)}
-					>
-						Editar
-					</button>
-				)}
+				<div className='invoice-hero-right'>
+					<span className={`status-badge status-${(invoice.workOrderStatus || 'EN_GESTION').toLowerCase().replace(/_/g, '-')}`}>
+						{STATUS_LABELS[invoice.workOrderStatus] ?? invoice.workOrderStatus ?? 'En gestión'}
+					</span>
+					{canEdit && (
+						<button className='btn-pill' onClick={() => navigate(`/invoices/${invoiceId}/edit`)}>
+							Editar
+						</button>
+					)}
+				</div>
 			</div>
 
-			<div className='invoice-detail-grid'>
-				<section className='stat-card'>
-					<h3>Datos de factura</h3>
+			{/* KPI strip */}
+			<div className='invoice-kpi-strip'>
+				<div className='invoice-kpi-tile'>
+					<span className='invoice-kpi-label'>Total</span>
+					<span className='invoice-kpi-value'>{formatMoney(invoice.precio)}</span>
+				</div>
+				<div className='invoice-kpi-tile'>
+					<span className='invoice-kpi-label'>Cobrado</span>
+					<span className='invoice-kpi-value invoice-kpi-paid'>{formatMoney(invoice.totalPaid)}</span>
+				</div>
+				<div className={`invoice-kpi-tile${balance > 0 ? ' invoice-kpi-tile--debt' : ' invoice-kpi-tile--paid'}`}>
+					<span className='invoice-kpi-label'>Saldo</span>
+					<span className='invoice-kpi-value'>{formatMoney(balance)}</span>
+				</div>
+			</div>
+
+			{/* Info grid */}
+			<div className='invoice-info-grid'>
+				<div className='panel'>
+					<h3 className='card-section-title'>Cliente</h3>
+					<p><strong>Nombre:</strong> {invoice.customerName || '-'}</p>
+					<p><strong>Teléfono:</strong> {invoice.customerPhone || invoice.clientPhone || '-'}</p>
+					<p><strong>ID Cliente:</strong> {invoice.customerId || '-'}</p>
+				</div>
+				<div className='panel'>
+					<h3 className='card-section-title'>Datos de factura</h3>
 					<p><strong>Cantidad:</strong> {invoice.cantidad || '-'}</p>
 					<p><strong>Emisión:</strong> {invoice.startDate || '-'}</p>
 					<p><strong>Vencimiento:</strong> {invoice.fechaEntrega || invoice.fechaEstimada || '-'}</p>
-					<p><strong>Notas:</strong> {invoice.notas || '-'}</p>
-				</section>
+					{invoice.notas && <p><strong>Notas:</strong> {invoice.notas}</p>}
+				</div>
+			</div>
 
-				<section className='stat-card'>
-					<h3>Cliente</h3>
-					<p><strong>Nombre:</strong> {invoice.customerName || '-'}</p>
-					<p><strong>Telefono:</strong> {invoice.customerPhone || invoice.clientPhone || '-'}</p>
-					<p><strong>ID Cliente:</strong> {invoice.customerId || '-'}</p>
-				</section>
-
-				<section className='stat-card'>
-					<h3>Gestion</h3>
-					<label>Estado</label>
-					<select
-						value={invoice.workOrderStatus || 'EN_GESTION'}
-						onChange={(e) => updateStatus(e.target.value)}
-						disabled={!canEdit || !invoice.workOrderId}
-						className='invoice-detail-status-select'
-					>
-						{INVOICE_STATUS_OPTIONS.map(({value, label}) => (
-							<option key={value} value={value}>{label}</option>
-						))}
-					</select>
-				</section>
-
-				<section className='stat-card'>
-					<h3>Cobranza</h3>
-					<p><strong>Total:</strong> {formatMoney(invoice.precio)}</p>
-					<p><strong>Cobrado:</strong> {formatMoney(invoice.totalPaid)}</p>
-					<p><strong>Saldo:</strong> {formatMoney(balance)}</p>
-					{canEdit && (
+			{/* Gestión panel */}
+			<div className='panel invoice-gestion-panel'>
+				<h3 className='card-section-title'>Gestión de cobranza</h3>
+				<label className='invoice-field-label'>Estado</label>
+				<select
+					value={invoice.workOrderStatus || 'EN_GESTION'}
+					onChange={(e) => updateStatus(e.target.value)}
+					disabled={!canEdit || !invoice.workOrderId}
+					className='invoice-detail-status-select'
+				>
+					{statuses.map((status) => (
+						<option key={status} value={status}>{STATUS_LABELS[status] ?? status}</option>
+					))}
+				</select>
+				{canEdit && (
+					<>
+						<h4 className='invoice-payment-subheading'>Registrar pago</h4>
 						<form onSubmit={addPayment} className='invoice-payment-form'>
 							<input
 								type='number'
@@ -166,69 +192,63 @@ export default function InvoiceDetail() {
 							</select>
 							<button className='btn-pill' type='submit'>Agregar</button>
 						</form>
-					)}
-				</section>
+					</>
+				)}
 			</div>
 
-			<section className='table-wrapper invoice-detail-table'>
-				<table className='orders-table'>
-					<thead>
-						<tr>
-							<th>Descripcion</th>
-							<th>Cant.</th>
-							<th>Precio unit.</th>
-							<th>Subtotal</th>
-						</tr>
-					</thead>
-					<tbody>
-						{invoice.lineItems?.length ? (
-							invoice.lineItems.map((item) => (
-								<tr key={item.id}>
-									<td>{item.description}</td>
-									<td>{item.quantity}</td>
-									<td>{formatMoney(item.unitPrice)}</td>
-									<td>{formatMoney(item.subtotal)}</td>
-								</tr>
-							))
-						) : (
+			{/* Line items */}
+			<div className='panel invoice-detail-table'>
+				<h3 className='card-section-title'>Items</h3>
+				<div className='table-wrapper'>
+					<table className='orders-table mobile-card-table'>
+						<thead>
 							<tr>
-								<td colSpan='4' className='invoice-detail-empty-cell'>
-									Sin items cargados.
-								</td>
+								<th>Descripcion</th><th>Cant.</th><th>Precio unit.</th><th>Subtotal</th>
 							</tr>
-						)}
-					</tbody>
-				</table>
-			</section>
+						</thead>
+						<tbody>
+							{invoice.lineItems?.length ? (
+								invoice.lineItems.map((item) => (
+									<tr key={item.id}>
+										<td data-label='Descripcion'>{item.description}</td>
+										<td data-label='Cant.'>{item.quantity}</td>
+										<td data-label='Precio unit.'>{formatMoney(item.unitPrice)}</td>
+										<td data-label='Subtotal'>{formatMoney(item.subtotal)}</td>
+									</tr>
+								))
+							) : (
+								<tr><td colSpan='4' className='invoice-detail-empty-cell'>Sin items cargados.</td></tr>
+							)}
+						</tbody>
+					</table>
+				</div>
+			</div>
 
-			<section className='table-wrapper invoice-detail-table'>
-				<table className='orders-table'>
-					<thead>
-						<tr>
-							<th>Fecha</th>
-							<th>Tipo</th>
-							<th>Monto</th>
-						</tr>
-					</thead>
-					<tbody>
-						{payments.length ? (
-							payments.map((p, idx) => (
-								<tr key={p.id || idx}>
-									<td>{p.paymentDate || '-'}</td>
-									<td>{p.paymentType || '-'}</td>
-									<td>{formatMoney(p.amount)}</td>
-								</tr>
-							))
-						) : (
-							<tr>
-								<td colSpan='3' className='invoice-detail-empty-cell'>
-									Sin pagos registrados.
-								</td>
-							</tr>
-						)}
-					</tbody>
-				</table>
-			</section>
+			{/* Payment history */}
+			<div className='panel invoice-detail-table'>
+				<h3 className='card-section-title'>Historial de pagos</h3>
+				<div className='table-wrapper'>
+					<table className='orders-table mobile-card-table'>
+						<thead>
+							<tr><th>Fecha</th><th>Tipo</th><th>Monto</th></tr>
+						</thead>
+						<tbody>
+							{payments.length ? (
+								payments.map((p, idx) => (
+									<tr key={p.id || idx}>
+										<td data-label='Fecha'>{p.paymentDate || '-'}</td>
+										<td data-label='Tipo'>{p.paymentType || '-'}</td>
+										<td data-label='Monto'>{formatMoney(p.amount)}</td>
+									</tr>
+								))
+							) : (
+								<tr><td colSpan='3' className='invoice-detail-empty-cell'>Sin pagos registrados.</td></tr>
+							)}
+						</tbody>
+					</table>
+				</div>
+			</div>
+
 		</div>
 	);
 }
