@@ -3,6 +3,7 @@ package com.example.demo.service.ingestion;
 import com.example.demo.dto.LedgerExtraction;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Component
+@ConditionalOnProperty(name = "telegram.staging.backend", havingValue = "memory", matchIfMissing = true)
 public class InMemoryPendingLedgerStore implements PendingLedgerStore {
     private static final long RESERVED = Long.MIN_VALUE;
 
