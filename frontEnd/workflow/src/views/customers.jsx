@@ -1,4 +1,4 @@
-import {useCallback, useContext, useEffect, useMemo, useState} from 'react';
+import {useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
 import axios from 'axios';
 import {FaEdit, FaPlus, FaSearch, FaTimes, FaTrashAlt} from 'react-icons/fa';
 import {BASE_URL} from '../api/config';
@@ -23,6 +23,9 @@ export default function Customers() {
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState('');
 	const [success, setSuccess] = useState('');
+	const [formOpen, setFormOpen] = useState(false);
+	const formPanelRef = useRef(null);
+	const nameInputRef = useRef(null);
 
 	const authHeaders = useCallback(() => {
 		const token = user?.token || localStorage.getItem('token');
@@ -53,6 +56,12 @@ export default function Customers() {
 		fetchCustomers();
 	}, [fetchCustomers]);
 
+	useEffect(() => {
+		if (!formOpen) return;
+		formPanelRef.current?.scrollIntoView({behavior: 'smooth', block: 'start'});
+		nameInputRef.current?.focus({preventScroll: true});
+	}, [formOpen]);
+
 	const filteredCustomers = useMemo(() => customers, [customers]);
 
 	const handleChange = (e) => {
@@ -63,10 +72,20 @@ export default function Customers() {
 		}));
 	};
 
-	const resetForm = () => {
+	const resetForm = (open = false) => {
 		setForm(emptyCustomer);
 		setEditingId(null);
 		setError('');
+		setFormOpen(open);
+	};
+
+	const openNewCustomer = () => {
+		setSuccess('');
+		resetForm(true);
+	};
+
+	const closeForm = () => {
+		resetForm(false);
 	};
 
 	const startEdit = (customer) => {
@@ -81,6 +100,7 @@ export default function Customers() {
 		});
 		setSuccess('');
 		setError('');
+		setFormOpen(true);
 	};
 
 	const handleSubmit = async (e) => {
@@ -110,7 +130,7 @@ export default function Customers() {
 				});
 				setSuccess('Cliente creado.');
 			}
-			resetForm();
+			resetForm(false);
 			fetchCustomers();
 		} catch (err) {
 			console.error(err);
@@ -131,7 +151,7 @@ export default function Customers() {
 			await axios.delete(`${BASE_URL}/api/customers/${customer.id}`, {
 				headers: authHeaders(),
 			});
-			if (editingId === customer.id) resetForm();
+			if (editingId === customer.id) resetForm(false);
 			setSuccess('Cliente eliminado.');
 			fetchCustomers();
 		} catch (err) {
@@ -152,11 +172,14 @@ export default function Customers() {
 			</div>
 
 			<div className='customers-layout'>
-				<section className='customer-form-panel'>
+				<section
+					ref={formPanelRef}
+					className={`customer-form-panel${formOpen ? ' is-open' : ''}`}
+				>
 					<div className='form-header'>
 						<h2>{editingId ? 'Editar Cliente' : 'Nuevo Cliente'}</h2>
-						{editingId && (
-							<button type='button' className='close-x' onClick={resetForm}>
+						{(editingId || formOpen) && (
+							<button type='button' className='close-x' onClick={closeForm}>
 								<FaTimes />
 							</button>
 						)}
@@ -165,6 +188,7 @@ export default function Customers() {
 						<div className='input-group'>
 							<label>Nombre</label>
 							<input
+								ref={nameInputRef}
 								name='name'
 								value={form.name}
 								onChange={handleChange}
@@ -237,8 +261,8 @@ export default function Customers() {
 								placeholder='Buscar por nombre, email, telefono o CUIT'
 							/>
 						</div>
-						<button className='btn-pill' type='button' onClick={resetForm}>
-							<FaPlus /> Nuevo
+						<button className='btn-pill' type='button' onClick={openNewCustomer}>
+							<FaPlus /> Nuevo cliente
 						</button>
 					</div>
 

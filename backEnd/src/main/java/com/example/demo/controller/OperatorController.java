@@ -1,6 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.CreateTenantRequest;
+import com.example.demo.dto.MonthlyActivityCount;
 import com.example.demo.dto.CreateTenantUserRequest;
 import com.example.demo.dto.SetTenantActiveRequest;
 import com.example.demo.dto.TenantActivityResponse;
@@ -41,6 +42,12 @@ public class OperatorController {
     @GetMapping("/tenants/{id}/activity")
     public ResponseEntity<List<TenantActivityResponse>> activity(@PathVariable Long id) {
         return ResponseEntity.ok(tenantService.recentActivity(id));
+    }
+
+    @GetMapping("/activity/monthly")
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<MonthlyActivityCount>> activityMonthly() {
+        return ResponseEntity.ok(tenantService.activityByMonth());
     }
 
     @PostMapping("/tenants")

@@ -104,6 +104,7 @@ public class AppUserService {
             response.put("role", foundUser.getAppUserRole());
             response.put("token", token);
             response.put("tenantId", tenantId);
+            response.put("mustChangePassword", foundUser.isMustChangePassword());
 
             return response;
 
@@ -128,6 +129,7 @@ public class AppUserService {
         if (creator != null && creator.getTenant() != null) {
             user.setTenant(creator.getTenant());
         }
+        user.setMustChangePassword(true);
 
         return appUserRepository.save(user);
     }
@@ -155,7 +157,26 @@ public class AppUserService {
         user.setPassword(passwordEncoder.encode(rawPassword));
         user.setAppUserRole(role != null ? role : AppUserRole.ADMIN);
         user.setTenant(tenant);
+        user.setMustChangePassword(true);
         return appUserRepository.save(user);
+    }
+
+    @Transactional
+    public void changeOwnPassword(String currentPassword, String newPassword) {
+        AppUser user = getCurrentUser();
+        if (user == null) throw new IllegalStateException("Usuario no autenticado");
+        if (currentPassword == null || !passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new IllegalArgumentException("Contrasena actual incorrecta");
+        }
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new IllegalArgumentException("La nueva contrasena debe tener al menos 8 caracteres");
+        }
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new IllegalArgumentException("La nueva contrasena debe ser diferente a la actual");
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setMustChangePassword(false);
+        appUserRepository.save(user);
     }
 
     private AppUserRole resolveCreatableRole(AppUser creator, AppUserRole requestedRole) {

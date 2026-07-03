@@ -43,6 +43,7 @@ public class Costs {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id")
+    @JsonIgnore
     private Tenant tenant;
 
     @ManyToOne(fetch = FetchType.LAZY)
