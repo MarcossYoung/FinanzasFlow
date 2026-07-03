@@ -308,7 +308,7 @@ function AdminPage() {
 				{/* SECTION B: TELEGRAM */}
 				<div className='costs-wrapper admin-section-panel'>
 					<div className='admin-users-header'>
-						<h2>Telegram</h2>
+						<h2 className='admin-section-title'>Telegram</h2>
 						<div className='admin-telegram-actions'>
 							<select
 								value={telegramOwnerId}
@@ -322,7 +322,7 @@ function AdminPage() {
 								))}
 							</select>
 							<button
-								className='button_3'
+								className='btn-pill'
 								onClick={handleGenerateTelegramCode}
 							>
 								<FaTelegramPlane /> Generar codigo
@@ -395,7 +395,7 @@ function AdminPage() {
 					<div
 						className='admin-users-header'
 					>
-						<h2>Gestión de Usuarios</h2>
+						<h2 className='admin-section-title'>Gestión de Usuarios</h2>
 					</div>
 
 					{/* Feedback Messages */}
@@ -554,7 +554,7 @@ function AdminPage() {
 							</div>
 							<button
 								type='submit'
-								className='button_3 margin-5 admin-modal-submit'
+								className='submit-button margin-5 admin-modal-submit'
 							>
 								Actualizar Contraseña
 							</button>
@@ -580,7 +580,7 @@ function AdminPage() {
 						</p>
 						<button
 							type='button'
-							className='button_3 margin-5 admin-modal-submit'
+							className='btn-pill margin-5 admin-modal-submit'
 							onClick={copyConnectCode}
 						>
 							<FaCopy /> Copiar comando

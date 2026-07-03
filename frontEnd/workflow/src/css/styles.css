@@ -1450,13 +1450,64 @@ main,
 		text-align: right;
 	}
 
+	.line-items-grid {
+		border: 1px solid #f1f2f6;
+		border-radius: 8px;
+		padding: 0.75rem;
+		gap: 0.5rem;
+	}
+
+	.line-item-remove {
+		justify-self: end;
+	}
+
 	.customers-layout {
 		grid-template-columns: 1fr;
+	}
+
+	.customers-list-panel {
+		order: 1;
+	}
+
+	.customer-form-panel {
+		order: 2;
+	}
+
+	.customer-form-panel:not(.is-open) {
+		display: none;
 	}
 
 	.customers-toolbar {
 		align-items: stretch;
 		flex-direction: column;
+	}
+}
+
+@media (min-width: 761px) {
+	.customer-form-panel {
+		display: block !important;
+	}
+}
+
+@media (max-width: 768px) {
+	.product-creation-container {
+		padding: 1rem 1rem calc(5.5rem + env(safe-area-inset-bottom));
+		max-width: 100%;
+		overflow-x: hidden;
+	}
+
+	.creation-form {
+		max-width: 100%;
+	}
+
+	.form-actions {
+		position: sticky;
+		bottom: calc(4.5rem + env(safe-area-inset-bottom));
+		background: #fff;
+		padding: 0.75rem 0;
+		margin-top: 0.75rem;
+		box-shadow: 0 -6px 14px rgba(0, 0, 0, 0.06);
+		z-index: 5;
 	}
 }
 
@@ -1911,6 +1962,9 @@ main,
 	border-top: 1px solid var(--color-border-light);
 	border-bottom: 1px solid var(--color-border-light);
 }
+.operator-form:not(.is-open) {
+	display: none;
+}
 .operator-form-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; }
 .operator-form-header h2 { font-size: 1rem; margin: 0; }
 .operator-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.85rem; margin-bottom: 1rem; }
@@ -1967,6 +2021,29 @@ main,
 .operator-action-table th, .operator-action-table td { padding: 0.75rem; text-align: left; border-top: 1px solid var(--color-border-light); }
 .operator-action-table th { background: var(--color-border-light); font-weight: 600; }
 .operator-action-table tbody tr:hover { background: var(--color-bg); }
+.operator-monthly-list {
+	display: grid;
+	gap: 0.65rem;
+}
+.operator-monthly-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 0.75rem;
+	border: 1px solid var(--color-border-light);
+	border-radius: var(--radius-sm);
+	background: var(--color-bg);
+}
+.operator-monthly-row span {
+	color: var(--color-text-muted);
+	font-size: 0.85rem;
+	font-weight: 700;
+}
+.operator-monthly-row strong {
+	color: var(--color-text);
+	font-size: 0.95rem;
+}
 
 /* Privacy policy */
 .privacy-policy {
@@ -1994,7 +2071,7 @@ main,
 .admin-section-title { margin-bottom: 1rem; }
 .admin-chart-container { width: 100%; flex: 1; min-height: 150px; }
 .admin-users-header { margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; }
-.admin-users-header .button_3 { display: flex; align-items: center; gap: 8px; }
+.admin-users-header .btn-pill { display: flex; align-items: center; gap: 8px; }
 .admin-users-table { box-shadow: none; padding: 0; margin: 0; }
 .admin-role-select { padding: 4px 8px; border-radius: 6px; border: 1px solid var(--color-text-light); font-size: 0.85rem; }
 .admin-telegram-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -2230,7 +2307,7 @@ main,
 	.costs-controls .filter-input,
 	.pagination-container .btn-pagination,
 	.pagination-controls .btn-pagination,
-	.admin-users-header .button_3,
+	.admin-users-header .btn-pill,
 	.admin-telegram-actions,
 	.operator-icon-button,
 	.operator-card-actions button,
@@ -2304,7 +2381,12 @@ main,
 	.operator-form-grid,
 	.costs-main-grid { grid-template-columns: 1fr; }
 	.invoice-detail-page,
-	.invoice-detail-loading { margin-left: 0; padding: 1rem; }
+	.invoice-detail-loading,
+	.customers-page,
+	.operator-page {
+		margin-left: 0;
+		padding: 1rem 1rem calc(5.5rem + env(safe-area-inset-bottom));
+	}
 }
 
 
@@ -2395,7 +2477,7 @@ main,
 }
 .invoice-kpi-strip {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
@@ -2422,6 +2504,20 @@ main,
 .invoice-field-label { display: block; font-weight: 700; color: var(--color-text-muted); font-size: 0.9rem; margin-bottom: 0.4rem; margin-top: 0.5rem; }
 .invoice-payment-subheading { font-size: 0.9rem; margin: 1rem 0 0.5rem; color: var(--color-text-muted); }
 @media (max-width: 768px) {
+  .invoice-kpi-strip {
+    gap: 0.5rem;
+  }
+  .invoice-kpi-tile {
+    padding: 0.6rem 0.7rem;
+  }
+  .invoice-kpi-value {
+    font-size: 0.95rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+  .invoice-kpi-label {
+    font-size: 0.68rem;
+  }
   .invoice-info-grid {
     grid-template-columns: 1fr;
   }

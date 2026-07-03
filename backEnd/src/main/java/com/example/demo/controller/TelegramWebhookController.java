@@ -1,10 +1,12 @@
 package com.example.demo.controller;
 
 import com.example.demo.config.TenantContext;
+import com.example.demo.dto.CreatePaymentRequest;
 import com.example.demo.dto.LedgerIngestionResult;
 import com.example.demo.model.Customer;
 import com.example.demo.model.Invoice;
 import com.example.demo.model.LedgerDirection;
+import com.example.demo.model.PaymentStatus;
 import com.example.demo.model.PaymentReminder;
 import com.example.demo.model.ReminderStatus;
 import com.example.demo.model.Status;
@@ -13,8 +15,10 @@ import com.example.demo.model.WorkOrder;
 import com.example.demo.repository.CustomerRepo;
 import com.example.demo.repository.InvoiceRepo;
 import com.example.demo.repository.PaymentReminderRepo;
+import com.example.demo.repository.PaymentRepo;
 import com.example.demo.repository.WorkOrderRepo;
 import com.example.demo.service.LedgerIngestionService;
+import com.example.demo.service.PaymentService;
 import com.example.demo.service.TelegramConnectionService;
 import com.example.demo.service.TelegramIngestionWorker;
 import com.example.demo.service.TelegramService;
@@ -33,6 +37,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -55,6 +60,8 @@ public class TelegramWebhookController {
     private final CustomerRepo customerRepo;
     private final PaymentReminderRepo reminderRepo;
     private final InvoiceRepo invoiceRepo;
+    private final PaymentRepo paymentRepo;
+    private final PaymentService paymentService;
     private final WorkOrderRepo workOrderRepo;
     private final TelegramService telegramService;
     private final TelegramConnectionService connectionService;
@@ -68,6 +75,8 @@ public class TelegramWebhookController {
     public TelegramWebhookController(CustomerRepo customerRepo,
                                      PaymentReminderRepo reminderRepo,
                                      InvoiceRepo invoiceRepo,
+                                     PaymentRepo paymentRepo,
+                                     PaymentService paymentService,
                                      WorkOrderRepo workOrderRepo,
                                      TelegramService telegramService,
                                      TelegramConnectionService connectionService,
@@ -80,6 +89,8 @@ public class TelegramWebhookController {
         this.customerRepo = customerRepo;
         this.reminderRepo = reminderRepo;
         this.invoiceRepo = invoiceRepo;
+        this.paymentRepo = paymentRepo;
+        this.paymentService = paymentService;
         this.workOrderRepo = workOrderRepo;
         this.telegramService = telegramService;
         this.connectionService = connectionService;
@@ -335,6 +346,11 @@ public class TelegramWebhookController {
                 return;
             }
 
+            if (normalized.startsWith("/pago ") || normalized.startsWith("pago ")) {
+                telegramService.sendMessage(chatId, handlePaymentCommand(text, tenantId));
+                return;
+            }
+
             telegramService.sendMessage(chatId, "No entendi el comando.\n\n" + helpText());
         } catch (Exception e) {
             telegramService.sendMessage(chatId, "No pude ejecutar el comando: " + e.getMessage());
@@ -416,6 +432,72 @@ public class TelegramWebhookController {
         return "Nota agregada a factura #" + invoiceId + ".";
     }
 
+    private String handlePaymentCommand(String text, Long tenantId) {
+        String[] parts = text.trim().split("\\s+", 3);
+        if (parts.length < 3) {
+            return "Formato: /pago <facturaId> <monto>  Ejemplo: /pago 42 15000";
+        }
+
+        Long invoiceId;
+        try {
+            invoiceId = Long.parseLong(parts[1].replaceFirst("^#", ""));
+        } catch (NumberFormatException e) {
+            return "ID de factura invalido: " + parts[1];
+        }
+
+        BigDecimal amount;
+        try {
+            amount = parsePaymentAmount(parts[2]);
+            if (amount.signum() <= 0) throw new ArithmeticException("non-positive");
+        } catch (Exception e) {
+            return "Monto invalido: " + parts[2];
+        }
+
+        Optional<Invoice> invoiceLookup = invoiceRepo.findByIdAndTenant_Id(invoiceId, tenantId);
+        if (invoiceLookup.isEmpty()) {
+            return "No encontre la factura #" + invoiceId + ".";
+        }
+        Invoice invoice = invoiceLookup.get();
+
+        try {
+            paymentService.createPayment(new CreatePaymentRequest(
+                    amount,
+                    "RESTO",
+                    invoiceId,
+                    LocalDate.now().toString(),
+                    "CASH"
+            ));
+        } catch (Exception e) {
+            return "No pude registrar el pago: " + e.getMessage();
+        }
+
+        BigDecimal totalPaid = paymentRepo.findByInvoice_IdAndTenant_Id(invoiceId, tenantId)
+                .stream()
+                .map(com.example.demo.model.OrderPayments::getAmount)
+                .filter(value -> value != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        boolean fullyCovered = invoice.getPrecio() != null
+                && totalPaid.compareTo(invoice.getPrecio()) >= 0;
+        if (fullyCovered && invoice.getPagoStatus() != PaymentStatus.PAGADO) {
+            invoice.setPagoStatus(PaymentStatus.PAGADO);
+            invoiceRepo.save(invoice);
+        }
+
+        return "Pago de $" + amount.toPlainString()
+                + " registrado en factura #" + invoiceId + "."
+                + (fullyCovered ? " PAGADO COMPLETO." : "");
+    }
+
+    private BigDecimal parsePaymentAmount(String raw) {
+        // TODO: locale - this parser intentionally follows Argentine separators.
+        String normalized = raw.trim().replaceAll("\\p{Sc}", "");
+        if (normalized.contains(",")) {
+            normalized = normalized.replace(".", "").replace(",", ".");
+        }
+        return new BigDecimal(normalized).setScale(2, RoundingMode.HALF_UP);
+    }
+
     private boolean captureReminderResponse(String chatId, String text) {
         return customerRepo.findByPhone(chatId)
                 .flatMap(this::latestReminder)
@@ -449,7 +531,9 @@ public class TelegramWebhookController {
                 || normalized.startsWith("/note ")
                 || normalized.startsWith("note ")
                 || normalized.startsWith("/nota ")
-                || normalized.startsWith("nota ");
+                || normalized.startsWith("nota ")
+                || normalized.startsWith("/pago ")
+                || normalized.startsWith("pago ");
     }
 
     private boolean isConnectCommand(String text) {
@@ -496,6 +580,7 @@ public class TelegramWebhookController {
                 /overdue - lista facturas vencidas abiertas
                 /status <invoiceId> <STATUS> - actualiza gestion
                 /note <invoiceId> <nota> - agrega nota a la factura
+                /pago <facturaId> <monto> - registra un pago en la factura
 
                 Estados: EN_GESTION, CONTACTADO, PROMETIO_PAGO, EN_DISPUTA, INCOBRABLE, CERRADO
                 """;

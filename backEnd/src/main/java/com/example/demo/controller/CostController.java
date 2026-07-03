@@ -2,6 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.config.TenantContext;
 import com.example.demo.dto.CostCreateRequest;
+import com.example.demo.dto.CostResponseDto;
 import com.example.demo.model.CostType;
 import com.example.demo.model.Costs;
 import com.example.demo.model.Tenant;
@@ -37,7 +38,7 @@ public class CostController {
     private CostService costService;
 
     @GetMapping
-    public ResponseEntity<?> getAll(
+    public ResponseEntity<Page<CostResponseDto>> getAll(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String from,
@@ -51,11 +52,12 @@ public class CostController {
             LocalDate toDate = LocalDate.parse(to);
             if (costType != null) {
                 return ResponseEntity.ok(costRepo.findByDateBetweenAndCostTypeAndTenant_Id(
-                        fromDate, toDate, costType, tenantId, pageable));
+                        fromDate, toDate, costType, tenantId, pageable).map(CostResponseDto::from));
             }
-            return ResponseEntity.ok(costRepo.findByDateBetweenAndTenant_Id(fromDate, toDate, tenantId, pageable));
+            return ResponseEntity.ok(costRepo.findByDateBetweenAndTenant_Id(
+                    fromDate, toDate, tenantId, pageable).map(CostResponseDto::from));
         }
-        return ResponseEntity.ok(costRepo.findByTenant_Id(tenantId, pageable));
+        return ResponseEntity.ok(costRepo.findByTenant_Id(tenantId, pageable).map(CostResponseDto::from));
     }
 
     @GetMapping("/summary")
@@ -78,12 +80,12 @@ public class CostController {
     }
 
     @PostMapping
-    public Costs create(@RequestBody CostCreateRequest cost) {
-        return costService.create(cost);
+    public CostResponseDto create(@RequestBody CostCreateRequest cost) {
+        return CostResponseDto.from(costService.create(cost));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Costs> update(@PathVariable Long id, @RequestBody Costs updated) {
+    public ResponseEntity<CostResponseDto> update(@PathVariable Long id, @RequestBody Costs updated) {
         Costs existing = costRepo.findByIdAndTenant_Id(id, currentTenantId()).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
         existing.setDate(updated.getDate());
@@ -91,7 +93,7 @@ public class CostController {
         existing.setReason(updated.getReason());
         existing.setCostType(updated.getCostType());
         existing.setFrequency(updated.getFrequency());
-        return ResponseEntity.ok(costRepo.save(existing));
+        return ResponseEntity.ok(CostResponseDto.from(costRepo.save(existing)));
     }
 
     @DeleteMapping("/{id}")

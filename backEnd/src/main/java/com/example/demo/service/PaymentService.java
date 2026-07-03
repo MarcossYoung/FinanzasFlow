@@ -17,6 +17,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,7 +59,7 @@ public class PaymentService {
         OrderPayments payment = new OrderPayments();
         payment.setAmount(req.valor());
         payment.setPaymentType(req.type());
-        payment.setPaymentDate(LocalDate.parse(req.fecha().replace('/', '-')));
+        payment.setPaymentDate(parsePaymentDate(req.fecha()));
         payment.setPaymentMethod(req.paymentMethod());
         payment.setInvoice(Invoice);
         payment.setTenant(Invoice.getTenant());
@@ -109,6 +111,19 @@ public class PaymentService {
             throw new RuntimeException("Tenant not available");
         }
         return tenantId;
+    }
+
+    private LocalDate parsePaymentDate(String rawDate) {
+        if (rawDate == null || rawDate.isBlank()) {
+            return LocalDate.now();
+        }
+
+        String normalized = rawDate.trim().replace('/', '-');
+        try {
+            return LocalDate.parse(normalized);
+        } catch (DateTimeParseException ignored) {
+            return LocalDate.parse(normalized, DateTimeFormatter.ofPattern("d-M-uuuu"));
+        }
     }
 
     private boolean isAllowedContentType(String contentType) {
