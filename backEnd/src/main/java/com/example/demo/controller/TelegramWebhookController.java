@@ -255,13 +255,19 @@ public class TelegramWebhookController {
         String[] parts = stringValue(callback.get("data")).split(":");
         if (parts.length != 3 || !"ledger".equals(parts[0])) return;
         Long token = parseOptionalLong(parts[1]);
+        if (token == null) return;
+
+        if ("CANCELAR".equals(parts[2])) {
+            handleCancelCallback(token, chatId);
+            return;
+        }
+
         LedgerDirection direction;
         try {
             direction = LedgerDirection.valueOf(parts[2]);
         } catch (Exception e) {
             return;
         }
-        if (token == null) return;
 
         Optional<PendingLedger> pending = pendingLedgerStore.get(token);
         if (pending.isEmpty()) {
@@ -307,6 +313,16 @@ public class TelegramWebhookController {
             log.warn("Telegram callback for chatId={} token={} has no enabled connection", chatId, token);
             telegramService.sendMessage(chatId, RECONNECT_INSTRUCTIONS);
         });
+    }
+
+    private void handleCancelCallback(long token, String chatId) {
+        Optional<PendingLedger> pending = pendingLedgerStore.get(token);
+        if (pending.isEmpty() || !pending.get().chatId().equals(chatId)) {
+            telegramService.sendMessage(chatId, "Esa carga ya expiro o fue procesada.");
+            return;
+        }
+        pendingLedgerStore.remove(token);
+        telegramService.sendMessage(chatId, "Cancelado. No se guardo ningun registro.");
     }
 
     private void answerCallbackQuery(String callbackId, String chatId) {
@@ -499,8 +515,16 @@ public class TelegramWebhookController {
     }
 
     private boolean captureReminderResponse(String chatId, String text) {
-        return customerRepo.findByPhone(chatId)
-                .flatMap(this::latestReminder)
+        List<Customer> matches = customerRepo.findByPhone(chatId);
+        if (matches.size() != 1) {
+            if (matches.size() > 1) {
+                log.warn("Telegram reminder-response lookup ambiguous for chatId={}: {} customers "
+                        + "share this phone/chat-id across tenants; skipping auto-capture to avoid "
+                        + "misattributing the reply to the wrong tenant.", chatId, matches.size());
+            }
+            return false;
+        }
+        return latestReminder(matches.get(0))
                 .map(reminder -> {
                     reminder.setResponse(text);
                     reminder.setRespondedAt(LocalDateTime.now());

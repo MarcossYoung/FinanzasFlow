@@ -86,13 +86,9 @@ public class InvoiceController {
     public ResponseEntity<InvoiceResponse> updateProduct(
             @PathVariable Long id,
             @RequestBody InvoiceUpdateDto dto
-    ) {
-        try {
-            InvoiceResponse updated = InvoiceService.update(id, dto);
-            return ResponseEntity.ok(updated);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+    ) throws ResourceNotFoundException {
+        InvoiceResponse updated = InvoiceService.update(id, dto);
+        return ResponseEntity.ok(updated);
     }
 
 

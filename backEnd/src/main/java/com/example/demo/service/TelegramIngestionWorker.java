@@ -74,7 +74,8 @@ public class TelegramIngestionWorker {
                     pendingText(extraction),
                     List.of(
                             new TelegramService.InlineButton("Cobro (factura)", callbackPrefix + "COBRO"),
-                            new TelegramService.InlineButton("Gasto (proveedor)", callbackPrefix + "GASTO")
+                            new TelegramService.InlineButton("Gasto (proveedor)", callbackPrefix + "GASTO"),
+                            new TelegramService.InlineButton("Cancelar", callbackPrefix + "CANCELAR")
                     )
             );
         } catch (TelegramApiException e) {
@@ -115,7 +116,8 @@ public class TelegramIngestionWorker {
                         pendingText(normalized),
                         List.of(
                                 new TelegramService.InlineButton("Cobro (factura)", callbackPrefix + "COBRO"),
-                                new TelegramService.InlineButton("Gasto (proveedor)", callbackPrefix + "GASTO")
+                                new TelegramService.InlineButton("Gasto (proveedor)", callbackPrefix + "GASTO"),
+                                new TelegramService.InlineButton("Cancelar", callbackPrefix + "CANCELAR")
                         )
                 );
             } catch (AiServiceException | IllegalArgumentException e) {
@@ -184,8 +186,30 @@ public class TelegramIngestionWorker {
             counterparty = "Sin contraparte";
         }
         String date = extraction == null || extraction.issueDate() == null ? "sin fecha" : extraction.issueDate().toString();
-        return "Detectado: $" + money(extraction == null ? null : extraction.amount())
-                + " - " + counterparty + " - " + date + "\nComo queres guardarlo?";
+
+        StringBuilder sb = new StringBuilder("Detectado: $")
+                .append(money(extraction == null ? null : extraction.amount()))
+                .append(" - ").append(counterparty)
+                .append(" - ").append(date);
+
+        String titulo = extraction == null ? null : extraction.titulo();
+        if (titulo != null && !titulo.isBlank()) {
+            sb.append("\nConcepto: ").append(titulo);
+        }
+
+        List<LedgerLineItemExtraction> rows = extraction == null || extraction.lineItems() == null
+                ? List.of() : extraction.lineItems();
+        if (!rows.isEmpty()) {
+            sb.append("\nItems:");
+            for (LedgerLineItemExtraction row : rows) {
+                sb.append("\n- ").append(value(row.description()))
+                        .append(" x").append(value(row.quantity()))
+                        .append(" @ $").append(value(row.unitPrice()));
+            }
+        }
+
+        sb.append("\nComo queres guardarlo? (Cancelar descarta esta carga)");
+        return sb.toString();
     }
 
     private String money(BigDecimal value) {

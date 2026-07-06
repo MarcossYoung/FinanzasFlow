@@ -6,8 +6,10 @@ import com.example.demo.model.AppUser;
 import com.example.demo.dto.CreatePaymentRequest;
 import com.example.demo.dto.LedgerExtraction;
 import com.example.demo.dto.LedgerIngestionResult;
+import com.example.demo.model.Customer;
 import com.example.demo.model.Invoice;
 import com.example.demo.model.OrderPayments;
+import com.example.demo.model.PaymentReminder;
 import com.example.demo.model.PaymentStatus;
 import com.example.demo.model.TelegramConnection;
 import com.example.demo.model.Tenant;
@@ -91,6 +93,42 @@ class TelegramWebhookControllerTest {
         ));
 
         assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
+    }
+
+    @Test
+    void captureReminderResponseSkipsWhenPhoneIsAmbiguousAcrossTenants() {
+        Customer tenantACustomer = customerWithId(1L);
+        Customer tenantBCustomer = customerWithId(2L);
+        when(customerRepo.findByPhone("42")).thenReturn(List.of(tenantACustomer, tenantBCustomer));
+        when(connectionService.resolveConnection("42")).thenReturn(Optional.empty());
+        TelegramWebhookController controller = controller();
+        Map<String, Object> update = Map.of("message", Map.of(
+                "message_id", 9,
+                "chat", Map.of("id", 42, "type", "private"),
+                "text", "Si, ya pague"
+        ));
+
+        assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
+        verifyNoInteractions(reminderRepo);
+    }
+
+    @Test
+    void captureReminderResponseUpdatesReminderForSingleUnambiguousMatch() {
+        Customer customer = customerWithId(1L);
+        PaymentReminder reminder = new PaymentReminder();
+        when(customerRepo.findByPhone("42")).thenReturn(List.of(customer));
+        when(reminderRepo.findTopByCustomer_IdOrderBySentAtDesc(1L)).thenReturn(Optional.of(reminder));
+        TelegramWebhookController controller = controller();
+        Map<String, Object> update = Map.of("message", Map.of(
+                "message_id", 9,
+                "chat", Map.of("id", 42, "type", "private"),
+                "text", "Si, ya pague"
+        ));
+
+        assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
+        verify(reminderRepo).save(reminder);
+        assertEquals("Si, ya pague", reminder.getResponse());
+        verifyNoInteractions(connectionService);
     }
 
     @Test
@@ -333,6 +371,12 @@ class TelegramWebhookControllerTest {
         return new TelegramWebhookController(
                 customerRepo, reminderRepo, invoiceRepo, paymentRepo, paymentService, workOrderRepo, telegramService,
                 connectionService, ingestionService, worker, pendingLedgerStore, directExecutor, "secret", debugEcho);
+    }
+
+    private Customer customerWithId(Long id) {
+        Customer customer = new Customer();
+        customer.setId(id);
+        return customer;
     }
 
     private PendingLedger pending() {

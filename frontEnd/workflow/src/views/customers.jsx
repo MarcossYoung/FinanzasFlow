@@ -1,8 +1,10 @@
 import {useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
 import axios from 'axios';
-import {FaEdit, FaPlus, FaSearch, FaTimes, FaTrashAlt} from 'react-icons/fa';
+import {FaChevronLeft, FaChevronRight, FaEdit, FaPlus, FaSearch, FaTimes, FaTrashAlt} from 'react-icons/fa';
 import {BASE_URL} from '../api/config';
 import {UserContext} from '../UserProvider';
+
+const PAGE_SIZE = 10;
 
 const emptyCustomer = {
 	name: '',
@@ -19,6 +21,8 @@ export default function Customers() {
 	const [form, setForm] = useState(emptyCustomer);
 	const [editingId, setEditingId] = useState(null);
 	const [searchTerm, setSearchTerm] = useState('');
+	const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+	const [currentPage, setCurrentPage] = useState(0);
 	const [loading, setLoading] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState('');
@@ -36,12 +40,12 @@ export default function Customers() {
 		setLoading(true);
 		setError('');
 		try {
-			const endpoint = searchTerm.trim()
+			const endpoint = debouncedSearchTerm.trim()
 				? `${BASE_URL}/api/customers/search`
 				: `${BASE_URL}/api/customers`;
 			const res = await axios.get(endpoint, {
 				headers: authHeaders(),
-				params: searchTerm.trim() ? {q: searchTerm.trim()} : {},
+				params: debouncedSearchTerm.trim() ? {q: debouncedSearchTerm.trim()} : {},
 			});
 			setCustomers(res.data || []);
 		} catch (err) {
@@ -50,7 +54,16 @@ export default function Customers() {
 		} finally {
 			setLoading(false);
 		}
-	}, [authHeaders, searchTerm]);
+	}, [authHeaders, debouncedSearchTerm]);
+
+	useEffect(() => {
+		const timeout = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+		return () => clearTimeout(timeout);
+	}, [searchTerm]);
+
+	useEffect(() => {
+		setCurrentPage(0);
+	}, [debouncedSearchTerm]);
 
 	useEffect(() => {
 		fetchCustomers();
@@ -62,7 +75,11 @@ export default function Customers() {
 		nameInputRef.current?.focus({preventScroll: true});
 	}, [formOpen]);
 
-	const filteredCustomers = useMemo(() => customers, [customers]);
+	const totalPages = Math.max(1, Math.ceil(customers.length / PAGE_SIZE));
+	const pagedCustomers = useMemo(
+		() => customers.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE),
+		[customers, currentPage],
+	);
 
 	const handleChange = (e) => {
 		const {name, value} = e.target;
@@ -287,8 +304,8 @@ export default function Customers() {
 											Cargando clientes...
 										</td>
 									</tr>
-								) : filteredCustomers.length ? (
-									filteredCustomers.map((customer) => (
+								) : pagedCustomers.length ? (
+									pagedCustomers.map((customer) => (
 										<tr key={customer.id}>
 											<td data-label='Cliente'>
 												<strong>{customer.name}</strong>
@@ -335,6 +352,20 @@ export default function Customers() {
 								)}
 							</tbody>
 						</table>
+					</div>
+
+					<div className='pagination-controls'>
+						<button disabled={currentPage === 0} onClick={() => setCurrentPage((p) => p - 1)}
+							className='btn-pagination'>
+							<FaChevronLeft /> Anterior
+						</button>
+						<span className='pagination-current'>
+							Página {currentPage + 1} de {totalPages}
+						</span>
+						<button disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage((p) => p + 1)}
+							className='btn-pagination'>
+							Siguiente <FaChevronRight />
+						</button>
 					</div>
 				</section>
 			</div>

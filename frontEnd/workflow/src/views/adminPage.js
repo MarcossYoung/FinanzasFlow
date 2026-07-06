@@ -411,7 +411,7 @@ function AdminPage() {
 					<div
 						className='table-wrapper admin-users-table'
 					>
-						<table className='orders-table'>
+						<table className='orders-table mobile-card-table'>
 							<thead>
 								<tr>
 									<th>ID</th>
@@ -424,11 +424,11 @@ function AdminPage() {
 								{users.length > 0 ? (
 									users.map((u) => (
 										<tr key={u.id}>
-											<td>{u.id}</td>
-											<td>
+											<td data-label='ID'>{u.id}</td>
+											<td data-label='Usuario'>
 												<strong>{u.username}</strong>
 											</td>
-											<td>
+											<td data-label='Rol'>
 												{editingUserId === u.id ? (
 													<select
 														value={editingRole}
@@ -446,7 +446,7 @@ function AdminPage() {
 													</span>
 												)}
 											</td>
-											<td className='text-center admin-user-actions'>
+											<td className='text-center admin-user-actions' data-label='Acciones'>
 												{editingUserId === u.id ? (
 													<>
 														<button

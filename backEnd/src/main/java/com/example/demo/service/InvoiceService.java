@@ -285,7 +285,7 @@ public class InvoiceService {
         LocalDate today = LocalDate.now().with(ChronoField.DAY_OF_WEEK, 1);
         LocalDate endOfWeek = today.plusDays(7);
 
-        List<Invoice> products = InvoiceRepo.findByFechaEstimadaBetweenAndTenant_Id(today, endOfWeek, tenantId);
+        List<Invoice> products = InvoiceRepo.findTop200ByFechaEstimadaBetweenAndTenant_IdOrderByFechaEstimadaAsc(today, endOfWeek, tenantId);
 
         return products.stream()
                 .map(InvoiceResponse::from)
@@ -315,7 +315,7 @@ public class InvoiceService {
 
     public List<InvoiceResponse> getProductsPastDue() {
         Long tenantId = currentTenantId();
-        List<Invoice> products = InvoiceRepo.findByWorkOrderStatusAndTenant_Id(Status.EN_DISPUTA, tenantId);
+        List<Invoice> products = InvoiceRepo.findTop200ByWorkOrderStatusAndTenant_IdOrderByIdDesc(Status.EN_DISPUTA, tenantId);
 
         return products.stream()
                 .map(InvoiceResponse::from)
@@ -324,7 +324,7 @@ public class InvoiceService {
 
     public List<InvoiceResponse> getProductsNotPickedUp(){
         Long tenantId = currentTenantId();
-        List<Invoice> products = InvoiceRepo.findByWorkOrderStatusAndTenant_Id(Status.PROMETIO_PAGO, tenantId);
+        List<Invoice> products = InvoiceRepo.findTop200ByWorkOrderStatusAndTenant_IdOrderByIdDesc(Status.PROMETIO_PAGO, tenantId);
 
         return products.stream()
                 .map(InvoiceResponse::from)

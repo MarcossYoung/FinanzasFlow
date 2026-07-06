@@ -1,13 +1,9 @@
-import React, {useEffect, useContext} from 'react';
-import axios from 'axios';
+import React, {useContext} from 'react';
 import {Outlet} from 'react-router-dom';
-import {useInvoices} from '../InvoicesContext';
-import {BASE_URL} from '../api/config';
 import {UserContext} from '../UserProvider';
 import {NavLink} from 'react-router-dom';
 
 export default function Dashboard() {
-	const {invoices, setInvoices} = useInvoices();
 	const {user} = useContext(UserContext);
 
 	const linkClass = ({isActive}) =>
@@ -15,24 +11,6 @@ export default function Dashboard() {
 
 	const isAdmin = user?.role === 'ADMIN';
 	const isGestor = user?.role === 'GESTOR';
-
-	useEffect(() => {
-		const fetchOrders = async () => {
-			try {
-				const res = await axios.get(`${BASE_URL}/api/invoices`, {
-					headers: {
-						Authorization: `Bearer ${localStorage.getItem(
-							'token',
-						)}`,
-					},
-				});
-				setInvoices(res.data.content || []);
-			} catch (err) {
-				console.error('Error fetching invoices:', err);
-			}
-		};
-		fetchOrders();
-	}, [setInvoices]);
 
 	return (
 		<div className='dashboard-layout'>
@@ -49,7 +27,7 @@ export default function Dashboard() {
 				</nav>
 
 				<div className='tab-content'>
-					<Outlet context={invoices} />
+					<Outlet />
 				</div>
 			</main>
 		</div>

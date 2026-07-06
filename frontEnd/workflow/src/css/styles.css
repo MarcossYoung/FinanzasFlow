@@ -1256,8 +1256,10 @@ main,
 	overflow: auto;
 }
 
-.customers-table {
-	min-width: 760px;
+@media (min-width: 769px) {
+	.customers-table {
+		min-width: 760px;
+	}
 }
 
 .customers-table td strong,
@@ -2392,25 +2394,15 @@ main,
 
 /* === MOBILE COSMETICS BATCH === */
 
-/* Item 1: Hide costs table on mobile */
-@media (max-width: 768px) {
-  .costs-table-mobile-hide {
-    display: none;
-  }
-}
-
 /* Item 1: Manual entry button style override */
 .manual-entry-disclosure.button-green {
   align-self: flex-start;
   width: auto;
 }
 
-/* Item 2: Hide admin sections on mobile */
+/* Item 2: Hide admin activity chart on mobile (users table now uses mobile-card-table instead of hiding) */
 @media (max-width: 768px) {
   .admin-chart-panel {
-    display: none;
-  }
-  .admin-users-section {
     display: none;
   }
 }
@@ -2632,4 +2624,44 @@ main,
   color: var(--color-text-muted);
   font-size: 0.78rem;
   margin-top: 0.25rem;
+}
+
+/* Customer picker (searchable combobox for invoice create/edit) */
+.customer-picker {
+  position: relative;
+}
+
+.customer-picker-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #dfe4ea);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.12));
+}
+
+.customer-picker-results li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+}
+
+.customer-picker-results li:hover {
+  background: var(--color-surface-hover, rgba(0, 184, 148, 0.08));
+}
+
+.customer-picker-meta {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
 }
