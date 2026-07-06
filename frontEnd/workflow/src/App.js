@@ -8,7 +8,6 @@ import {
     useLocation,
 } from 'react-router-dom';
 import {UserContext} from './UserProvider';
-import {InvoicesProvider} from './InvoicesContext';
 import Loader from './loader';
 
 // Keep these static because they are wrappers/layouts used immediately
@@ -46,9 +45,8 @@ function App() {
     const {user, setUser} = useContext(UserContext);
 
     return (
-        <InvoicesProvider>
-            <Router>
-                <AuthenticatedMobileNav />
+        <Router>
+            <AuthenticatedMobileNav />
                 <Suspense fallback={<Loader />}>
                     <Routes>
                         {/* Public Routes */}
@@ -194,8 +192,7 @@ function App() {
                         <Route path='*' element={<Navigate to={defaultRouteFor(user)} replace />} />
                     </Routes>
                 </Suspense>
-            </Router>
-        </InvoicesProvider>
+        </Router>
     );
 }
 

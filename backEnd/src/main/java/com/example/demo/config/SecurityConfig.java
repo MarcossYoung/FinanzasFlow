@@ -114,7 +114,7 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.GET, "/api/users").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
 
-                        .requestMatchers("/api/users/profile/**", "/api/workOrders/**").authenticated()
+                        .requestMatchers("/api/users/profile/**").authenticated()
 
                         // Ensure all other paths are secured (Fixing the previous issue I pointed out)
                         .anyRequest().authenticated()

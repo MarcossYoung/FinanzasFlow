@@ -123,7 +123,6 @@ Backend:
 - `GET /api/invoices/{id}`
 - `PUT /api/invoices/{id}`
 - `DELETE /api/invoices/{id}`
-- `GET /api/invoices/types`
 - `GET /api/invoices/due-this-week`
 - `GET /api/invoices/past-due`
 - `GET /api/invoices/not-picked-up`
@@ -287,7 +286,6 @@ Backend:
 - `POST /api/ai/parse-order`
 - `POST /api/ai/parse-search`
 - `GET /api/ai/weekly-digest`
-- `POST /api/ai/chat`
 
 Current AI responsibilities:
 - Finance insights
@@ -320,6 +318,7 @@ Admin commands:
 - `/overdue` or `/vencidas`
 - `/status <invoiceId> <STATUS>`
 - `/note <invoiceId> <note text>`
+- `/pago <invoiceId> <monto>` (registers a payment against the invoice; can move it to `PAGADO`)
 
 ### Query Overdue
 

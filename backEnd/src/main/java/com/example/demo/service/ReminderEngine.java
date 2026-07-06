@@ -8,9 +8,11 @@ import com.example.demo.model.PaymentSchedule;
 import com.example.demo.model.ReminderChannel;
 import com.example.demo.model.ReminderStatus;
 import com.example.demo.model.ScheduleStatus;
+import com.example.demo.model.Tenant;
 import com.example.demo.repository.InvoiceRepo;
 import com.example.demo.repository.PaymentReminderRepo;
 import com.example.demo.repository.PaymentScheduleRepo;
+import com.example.demo.repository.TenantRepo;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -31,17 +33,20 @@ public class ReminderEngine {
     private final PaymentReminderRepo reminderRepo;
     private final TelegramService telegramService;
     private final InvoiceRepo invoiceRepo;
+    private final TenantRepo tenantRepo;
     private final Set<String> adminChatIds;
 
     public ReminderEngine(PaymentScheduleRepo scheduleRepo,
                           PaymentReminderRepo reminderRepo,
                           TelegramService telegramService,
                           InvoiceRepo invoiceRepo,
+                          TenantRepo tenantRepo,
                           @Value("${telegram.admin.chat-ids:}") String adminChatIds) {
         this.scheduleRepo = scheduleRepo;
         this.reminderRepo = reminderRepo;
         this.telegramService = telegramService;
         this.invoiceRepo = invoiceRepo;
+        this.tenantRepo = tenantRepo;
         this.adminChatIds = parseAdminChatIds(adminChatIds);
     }
 
@@ -49,12 +54,14 @@ public class ReminderEngine {
     @Transactional
     public void runDailyReminders() {
         LocalDate today = LocalDate.now();
-        connectOverdueInvoices(today);
-        sendScheduleReminders(today);
+        for (Tenant tenant : tenantRepo.findAll()) {
+            connectOverdueInvoices(today, tenant.getId());
+            sendScheduleReminders(today, tenant.getId());
+        }
     }
 
-    private void connectOverdueInvoices(LocalDate today) {
-        for (Invoice invoice : invoiceRepo.findOverdueOpenInvoices(today)) {
+    private void connectOverdueInvoices(LocalDate today, Long tenantId) {
+        for (Invoice invoice : invoiceRepo.findOverdueOpenInvoicesByTenant(today, tenantId)) {
             if (invoice.getCustomer() == null || invoice.getTenant() == null) {
                 sendAdminPrompt(invoice, "Factura vencida sin cliente o tenant asignado.");
                 continue;
@@ -79,17 +86,17 @@ public class ReminderEngine {
         }
     }
 
-    private void sendScheduleReminders(LocalDate today) {
+    private void sendScheduleReminders(LocalDate today, Long tenantId) {
         LocalDateTime dayStart = today.atStartOfDay();
         LocalDateTime dayEnd = dayStart.plusDays(1);
 
-        for (PaymentSchedule schedule : scheduleRepo.findByStatusAndExpectedDateBetween(
-                ScheduleStatus.PENDIENTE, today.minusDays(30), today.plusDays(3))) {
+        for (PaymentSchedule schedule : scheduleRepo.findByTenant_IdAndStatusAndExpectedDateBetween(
+                tenantId, ScheduleStatus.PENDIENTE, today.minusDays(30), today.plusDays(3))) {
             sendReminderForSchedule(schedule, today, dayStart, dayEnd);
         }
 
-        for (PaymentSchedule schedule : scheduleRepo.findByStatusAndExpectedDateBetween(
-                ScheduleStatus.VENCIDO, today.minusDays(365), today)) {
+        for (PaymentSchedule schedule : scheduleRepo.findByTenant_IdAndStatusAndExpectedDateBetween(
+                tenantId, ScheduleStatus.VENCIDO, today.minusDays(365), today)) {
             sendReminderForSchedule(schedule, today, dayStart, dayEnd);
         }
     }

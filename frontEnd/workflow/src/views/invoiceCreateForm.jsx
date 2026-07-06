@@ -1,8 +1,9 @@
-import {useState, useContext, useEffect} from 'react';
+import {useState, useContext} from 'react';
 import axios from 'axios';
 import {UserContext} from '../UserProvider';
 import {useNavigate} from 'react-router-dom';
 import {BASE_URL} from '../api/config';
+import CustomerPicker from '../components/CustomerPicker';
 
 const emptyInvoice = {
 	titulo: '',
@@ -21,22 +22,19 @@ const emptyInvoice = {
 const InvoiceCreateForm = ({isModal = false, onClose}) => {
 	const navigate = useNavigate();
 	const {user} = useContext(UserContext);
-	const [customers, setCustomers] = useState([]);
 	const [invoiceData, setInvoiceData] = useState(emptyInvoice);
 	const [error, setError] = useState(null);
 	const [success, setSuccess] = useState(false);
+	const [submitting, setSubmitting] = useState(false);
 
-	useEffect(() => {
+	const authHeaders = () => {
 		const token = user?.token || localStorage.getItem('token');
-		const headers = token ? {Authorization: `Bearer ${token}`} : {};
+		return token ? {Authorization: `Bearer ${token}`} : {};
+	};
 
-		axios
-			.get(`${BASE_URL}/api/customers`, {headers})
-			.then((res) => setCustomers(res.data || []))
-			.catch((err) => {
-				console.error('Error loading customers:', err);
-			});
-	}, [user?.token]);
+	const handleCustomerChange = (customerId) => {
+		setInvoiceData((prev) => ({...prev, customerId: customerId || ''}));
+	};
 
 	const handleInputChange = (e) => {
 		const {name, value} = e.target;
@@ -98,6 +96,8 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
+		if (submitting) return;
+		setSubmitting(true);
 		setError(null);
 		setSuccess(false);
 
@@ -136,6 +136,8 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 				err.response?.data?.message ||
 					'Error al crear la factura. Intente nuevamente.',
 			);
+		} finally {
+			setSubmitting(false);
 		}
 	};
 
@@ -168,18 +170,11 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 				<div className='input-row'>
 					<div className='input-group'>
 						<label>Cliente</label>
-						<select
-							name='customerId'
+						<CustomerPicker
 							value={invoiceData.customerId}
-							onChange={handleInputChange}
-						>
-							<option value=''>Sin cliente asignado</option>
-							{customers.map((customer) => (
-								<option key={customer.id} value={customer.id}>
-									{customer.name}
-								</option>
-							))}
-						</select>
+							onChange={handleCustomerChange}
+							headers={authHeaders()}
+						/>
 					</div>
 					<div className='input-group'>
 						<label>Telefono de contacto</label>
@@ -324,9 +319,9 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 				<button
 					type='submit'
 					className='submit-button'
-					disabled={!invoiceData.titulo || lineItemsTotal <= 0}
+					disabled={submitting || !invoiceData.titulo || lineItemsTotal <= 0}
 				>
-					Guardar Factura
+					{submitting ? 'Guardando...' : 'Guardar Factura'}
 				</button>
 
 				{error && <p className='error-text'>{error}</p>}
