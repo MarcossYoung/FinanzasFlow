@@ -32,6 +32,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final PasswordChangeRequiredFilter passwordChangeRequiredFilter;
     private final CustomUserDetailsService customUserDetailsService;
     private final PasswordEncoder passwordEncoder;
 
@@ -40,9 +41,11 @@ public class SecurityConfig {
 
     @Autowired
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          PasswordChangeRequiredFilter passwordChangeRequiredFilter,
                           CustomUserDetailsService customUserDetailsService,
                           PasswordEncoder passwordEncoder) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.passwordChangeRequiredFilter = passwordChangeRequiredFilter;
         this.customUserDetailsService = customUserDetailsService;
         this.passwordEncoder = passwordEncoder;
     }
@@ -81,7 +84,7 @@ public class SecurityConfig {
 
                         // Existing public paths
                         .requestMatchers("/api/users/login").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/users/registro").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/users/registro").hasAuthority("SUPER_ADMIN")
                         .requestMatchers("/api/payments", "/api/payments/**").hasAnyAuthority("ADMIN", "GESTOR")
                         .requestMatchers("/api/workorders", "/api/workorders/**").hasAnyAuthority("ADMIN", "GESTOR")
 
@@ -111,7 +114,7 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.GET, "/api/users").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
 
-                        .requestMatchers("/api/users/profile/**", "/api/workOrders/**").authenticated()
+                        .requestMatchers("/api/users/profile/**").authenticated()
 
                         // Ensure all other paths are secured (Fixing the previous issue I pointed out)
                         .anyRequest().authenticated()
@@ -119,6 +122,7 @@ public class SecurityConfig {
 
                 // Register JWT filter
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(passwordChangeRequiredFilter, JwtAuthenticationFilter.class)
 
                 // Allow H2 console iframe
                 .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin));

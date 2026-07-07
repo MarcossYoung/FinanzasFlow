@@ -1,10 +1,14 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.CreateTenantRequest;
+import com.example.demo.dto.CreateTenantUserRequest;
+import com.example.demo.dto.MonthlyActivityCount;
 import com.example.demo.dto.SetTenantActiveRequest;
 import com.example.demo.dto.TenantActivityResponse;
 import com.example.demo.dto.TenantOperationalSummary;
 import com.example.demo.dto.UpdateTenantRequest;
+import com.example.demo.dto.UserSummaryDto;
+import com.example.demo.model.AppUser;
 import com.example.demo.model.AppUserRole;
 import com.example.demo.model.Tenant;
 import com.example.demo.repository.TenantActivityRepo;
@@ -67,6 +71,22 @@ public class TenantService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<MonthlyActivityCount> activityByMonth() {
+        LocalDateTime from = LocalDateTime.now()
+                .minusMonths(12)
+                .withDayOfMonth(1)
+                .withHour(0).withMinute(0).withSecond(0).withNano(0);
+        return activityRepo.countByYearMonth(from).stream()
+                .map(row -> {
+                    int year = ((Number) row[0]).intValue();
+                    int month = ((Number) row[1]).intValue();
+                    long count = ((Number) row[2]).longValue();
+                    return new MonthlyActivityCount(String.format("%04d-%02d", year, month), count);
+                })
+                .toList();
+    }
+
     @Transactional
     public TenantOperationalSummary create(CreateTenantRequest request) {
         validateCreate(request);
@@ -98,6 +118,18 @@ public class TenantService {
         Tenant tenant = ensureTenant(tenantId);
         tenant.setActive(request.active());
         return summary(tenant.getId());
+    }
+
+    @Transactional
+    public UserSummaryDto addUserToTenant(Long tenantId, CreateTenantUserRequest request) {
+        Tenant tenant = ensureTenant(tenantId);
+        AppUser created = appUserService.createTenantUser(
+                tenant,
+                request.username(),
+                request.password(),
+                request.appUserRole()
+        );
+        return new UserSummaryDto(created.getId(), created.getUsername(), created.getAppUserRole().name());
     }
 
     @Transactional(readOnly = true)

@@ -65,12 +65,13 @@ public class AppUserService {
     }
 
     public Map<String, Object> loginUser(String username, String password) {
+        String normalizedUsername = normalizeUsername(username);
         try {
-            assertLoginAllowed(username);
-            Optional<AppUser> userLookup = appUserRepository.findByUsername(username);
+            assertLoginAllowed(normalizedUsername);
+            Optional<AppUser> userLookup = appUserRepository.findByUsername(normalizedUsername);
             if (userLookup.isEmpty()) {
-                recordFailedLogin(username);
-                throw new UsernameNotFoundException("User not found: " + username);
+                recordFailedLogin(normalizedUsername);
+                throw new UsernameNotFoundException("User not found: " + normalizedUsername);
             }
             AppUser foundUser = userLookup.get();
             if (!isAllowedByTenantState(foundUser)) {
@@ -78,11 +79,11 @@ public class AppUserService {
             }
 
             if (password == null || !passwordEncoder.matches(password, foundUser.getPassword())) {
-                recordFailedLogin(username);
-                log.warn("Login password mismatch for username='{}'", username);
+                recordFailedLogin(normalizedUsername);
+                log.warn("Login password mismatch for username='{}'", normalizedUsername);
                 throw new BadCredentialsException("Invalid username or password");
             }
-            clearFailedLogin(username);
+            clearFailedLogin(normalizedUsername);
 
             // Set security context
             Authentication authentication = new UsernamePasswordAuthenticationToken(
@@ -103,6 +104,7 @@ public class AppUserService {
             response.put("role", foundUser.getAppUserRole());
             response.put("token", token);
             response.put("tenantId", tenantId);
+            response.put("mustChangePassword", foundUser.isMustChangePassword());
 
             return response;
 
@@ -114,18 +116,20 @@ public class AppUserService {
     }
 
     public AppUser registerUser(AppUser registration) {
-        if (appUserRepository.existsByUsername(registration.getUsername())) {
+        String normalizedUsername = normalizeUsername(registration.getUsername());
+        if (appUserRepository.existsByUsername(normalizedUsername)) {
             throw new UserAlreadyExistsException("Usuario ya existe");
         }
 
         AppUser user = new AppUser();
-        user.setUsername(registration.getUsername());
+        user.setUsername(normalizedUsername);
         user.setPassword(passwordEncoder.encode(registration.getPassword()));
         AppUser creator = getCurrentUser();
         user.setAppUserRole(resolveCreatableRole(creator, registration.getAppUserRole()));
         if (creator != null && creator.getTenant() != null) {
             user.setTenant(creator.getTenant());
         }
+        user.setMustChangePassword(true);
 
         return appUserRepository.save(user);
     }
@@ -144,15 +148,35 @@ public class AppUserService {
         if (role == AppUserRole.SUPER_ADMIN) {
             throw new IllegalArgumentException("Tenant users cannot be SUPER_ADMIN");
         }
-        if (appUserRepository.existsByUsername(username.trim())) {
+        String normalizedUsername = normalizeUsername(username);
+        if (appUserRepository.existsByUsername(normalizedUsername)) {
             throw new UserAlreadyExistsException("Usuario ya existe");
         }
         AppUser user = new AppUser();
-        user.setUsername(username.trim());
+        user.setUsername(normalizedUsername);
         user.setPassword(passwordEncoder.encode(rawPassword));
         user.setAppUserRole(role != null ? role : AppUserRole.ADMIN);
         user.setTenant(tenant);
+        user.setMustChangePassword(true);
         return appUserRepository.save(user);
+    }
+
+    @Transactional
+    public void changeOwnPassword(String currentPassword, String newPassword) {
+        AppUser user = getCurrentUser();
+        if (user == null) throw new IllegalStateException("Usuario no autenticado");
+        if (currentPassword == null || !passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new IllegalArgumentException("Contrasena actual incorrecta");
+        }
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new IllegalArgumentException("La nueva contrasena debe tener al menos 8 caracteres");
+        }
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new IllegalArgumentException("La nueva contrasena debe ser diferente a la actual");
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setMustChangePassword(false);
+        appUserRepository.save(user);
     }
 
     private AppUserRole resolveCreatableRole(AppUser creator, AppUserRole requestedRole) {
@@ -177,7 +201,7 @@ public class AppUserService {
         return currentUser.getTenant().getId().equals(target.getTenant().getId()) ? target : null;
     }
 
-    public Optional<AppUser> findByUsername(String username){ return  appUserRepository.findByUsername(username); }
+    public Optional<AppUser> findByUsername(String username){ return  appUserRepository.findByUsername(normalizeUsername(username)); }
 
 
     public AppUser getCurrentUser() {
@@ -259,6 +283,10 @@ public class AppUserService {
 
     private String loginKey(String username) {
         return username == null ? "" : username.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static String normalizeUsername(String raw) {
+        return raw == null ? null : raw.trim().toLowerCase(Locale.ROOT);
     }
 
     private record LoginAttempt(int failures, Instant lockedUntil) {}

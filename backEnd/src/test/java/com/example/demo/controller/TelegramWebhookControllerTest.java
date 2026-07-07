@@ -3,12 +3,19 @@ package com.example.demo.controller;
 import com.example.demo.model.LedgerDirection;
 import com.example.demo.model.LedgerRecordType;
 import com.example.demo.model.AppUser;
+import com.example.demo.dto.CreatePaymentRequest;
 import com.example.demo.dto.LedgerExtraction;
 import com.example.demo.dto.LedgerIngestionResult;
+import com.example.demo.model.Customer;
+import com.example.demo.model.Invoice;
+import com.example.demo.model.OrderPayments;
+import com.example.demo.model.PaymentReminder;
+import com.example.demo.model.PaymentStatus;
 import com.example.demo.model.TelegramConnection;
 import com.example.demo.model.Tenant;
 import com.example.demo.repository.*;
 import com.example.demo.service.LedgerIngestionService;
+import com.example.demo.service.PaymentService;
 import com.example.demo.service.TelegramConnectionService;
 import com.example.demo.service.TelegramIngestionWorker;
 import com.example.demo.service.TelegramService;
@@ -26,6 +33,7 @@ import java.util.Optional;
 import java.util.concurrent.Executor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -33,6 +41,8 @@ class TelegramWebhookControllerTest {
     private final CustomerRepo customerRepo = mock(CustomerRepo.class);
     private final PaymentReminderRepo reminderRepo = mock(PaymentReminderRepo.class);
     private final InvoiceRepo invoiceRepo = mock(InvoiceRepo.class);
+    private final PaymentRepo paymentRepo = mock(PaymentRepo.class);
+    private final PaymentService paymentService = mock(PaymentService.class);
     private final WorkOrderRepo workOrderRepo = mock(WorkOrderRepo.class);
     private final TelegramService telegramService = mock(TelegramService.class);
     private final TelegramConnectionService connectionService = mock(TelegramConnectionService.class);
@@ -83,6 +93,42 @@ class TelegramWebhookControllerTest {
         ));
 
         assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
+    }
+
+    @Test
+    void captureReminderResponseSkipsWhenPhoneIsAmbiguousAcrossTenants() {
+        Customer tenantACustomer = customerWithId(1L);
+        Customer tenantBCustomer = customerWithId(2L);
+        when(customerRepo.findByPhone("42")).thenReturn(List.of(tenantACustomer, tenantBCustomer));
+        when(connectionService.resolveConnection("42")).thenReturn(Optional.empty());
+        TelegramWebhookController controller = controller();
+        Map<String, Object> update = Map.of("message", Map.of(
+                "message_id", 9,
+                "chat", Map.of("id", 42, "type", "private"),
+                "text", "Si, ya pague"
+        ));
+
+        assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
+        verifyNoInteractions(reminderRepo);
+    }
+
+    @Test
+    void captureReminderResponseUpdatesReminderForSingleUnambiguousMatch() {
+        Customer customer = customerWithId(1L);
+        PaymentReminder reminder = new PaymentReminder();
+        when(customerRepo.findByPhone("42")).thenReturn(List.of(customer));
+        when(reminderRepo.findTopByCustomer_IdOrderBySentAtDesc(1L)).thenReturn(Optional.of(reminder));
+        TelegramWebhookController controller = controller();
+        Map<String, Object> update = Map.of("message", Map.of(
+                "message_id", 9,
+                "chat", Map.of("id", 42, "type", "private"),
+                "text", "Si, ya pague"
+        ));
+
+        assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
+        verify(reminderRepo).save(reminder);
+        assertEquals("Si, ya pague", reminder.getResponse());
+        verifyNoInteractions(connectionService);
     }
 
     @Test
@@ -230,14 +276,107 @@ class TelegramWebhookControllerTest {
         verify(connectionService, never()).resolveConnection(anyString());
     }
 
+    @Test
+    void pagoCommandRegistersPaymentAndMarksInvoicePaidWhenFullyCovered() {
+        Tenant tenant = new Tenant();
+        tenant.setId(1L);
+        Invoice invoice = new Invoice();
+        invoice.setId(1L);
+        invoice.setTenant(tenant);
+        invoice.setPrecio(new BigDecimal("100.00"));
+        invoice.setPagoStatus(PaymentStatus.PENDIENTE);
+        OrderPayments existingPayment = new OrderPayments();
+        existingPayment.setAmount(new BigDecimal("60.00"));
+        OrderPayments newPayment = new OrderPayments();
+        newPayment.setAmount(new BigDecimal("40.00"));
+
+        when(connectionService.resolveConnection("42")).thenReturn(Optional.of(connection(1L, 2L)));
+        when(invoiceRepo.findByIdAndTenant_Id(1L, 1L)).thenReturn(Optional.of(invoice));
+        when(paymentService.createPayment(any(CreatePaymentRequest.class))).thenReturn(newPayment);
+        when(paymentRepo.findByInvoice_IdAndTenant_Id(1L, 1L))
+                .thenReturn(List.of(existingPayment, newPayment));
+
+        TelegramWebhookController controller = controller();
+        Map<String, Object> update = Map.of("message", Map.of(
+                "message_id", 9,
+                "chat", Map.of("id", 42, "type", "private"),
+                "text", "/pago #1 $40,00"
+        ));
+
+        assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
+        org.mockito.ArgumentCaptor<CreatePaymentRequest> requestCaptor =
+                org.mockito.ArgumentCaptor.forClass(CreatePaymentRequest.class);
+        verify(paymentService).createPayment(requestCaptor.capture());
+        assertEquals(new BigDecimal("40.00"), requestCaptor.getValue().valor());
+        assertEquals("RESTO", requestCaptor.getValue().type());
+        assertEquals(1L, requestCaptor.getValue().product_id());
+        assertEquals(LocalDate.now().toString(), requestCaptor.getValue().fecha());
+        assertEquals("CASH", requestCaptor.getValue().paymentMethod());
+        assertEquals(PaymentStatus.PAGADO, invoice.getPagoStatus());
+        verify(invoiceRepo).save(invoice);
+        verify(telegramService).sendMessage(eq("42"), contains("PAGADO COMPLETO"));
+    }
+
+    @Test
+    void pagoCommandRejectsMalformedAmountWithoutCallingPaymentService() {
+        when(connectionService.resolveConnection("42")).thenReturn(Optional.of(connection(1L, 2L)));
+        TelegramWebhookController controller = controller();
+        Map<String, Object> update = Map.of("message", Map.of(
+                "message_id", 9,
+                "chat", Map.of("id", 42, "type", "private"),
+                "text", "/pago 1 abc"
+        ));
+
+        assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
+        verify(telegramService).sendMessage("42", "Monto invalido: abc");
+        verifyNoInteractions(paymentService);
+    }
+
+    @Test
+    void pagoCommandReportsMissingTenantInvoice() {
+        when(connectionService.resolveConnection("42")).thenReturn(Optional.of(connection(1L, 2L)));
+        when(invoiceRepo.findByIdAndTenant_Id(123L, 1L)).thenReturn(Optional.empty());
+        TelegramWebhookController controller = controller();
+        Map<String, Object> update = Map.of("message", Map.of(
+                "message_id", 9,
+                "chat", Map.of("id", 42, "type", "private"),
+                "text", "/pago 123 5000"
+        ));
+
+        assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
+        verify(telegramService).sendMessage("42", "No encontre la factura #123.");
+        verifyNoInteractions(paymentService);
+    }
+
+    @Test
+    void helpIncludesPagoCommand() {
+        when(connectionService.resolveConnection("42")).thenReturn(Optional.of(connection(1L, 2L)));
+        TelegramWebhookController controller = controller();
+        Map<String, Object> update = Map.of("message", Map.of(
+                "message_id", 9,
+                "chat", Map.of("id", 42, "type", "private"),
+                "text", "/help"
+        ));
+
+        assertEquals(HttpStatus.OK, controller.webhook("secret", update).getStatusCode());
+        verify(telegramService).sendMessage(eq("42"), argThat(message ->
+                message != null && message.contains("/pago <facturaId> <monto>")));
+    }
+
     private TelegramWebhookController controller() {
         return controller(false);
     }
 
     private TelegramWebhookController controller(boolean debugEcho) {
         return new TelegramWebhookController(
-                customerRepo, reminderRepo, invoiceRepo, workOrderRepo, telegramService,
+                customerRepo, reminderRepo, invoiceRepo, paymentRepo, paymentService, workOrderRepo, telegramService,
                 connectionService, ingestionService, worker, pendingLedgerStore, directExecutor, "secret", debugEcho);
+    }
+
+    private Customer customerWithId(Long id) {
+        Customer customer = new Customer();
+        customer.setId(id);
+        return customer;
     }
 
     private PendingLedger pending() {

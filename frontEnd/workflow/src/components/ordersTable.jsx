@@ -25,6 +25,7 @@ export default function InvoicesTable({endpoint, allowManualCreate = false}) {
 	const [currentPage, setCurrentPage] = useState(0);
 	const [totalPages, setTotalPages] = useState(0);
 	const [searchTerm, setSearchTerm] = useState('');
+	const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 	const [isModalOpen, setIsModalOpen] = useState(false);
 
 	const fetchInvoices = useCallback(async () => {
@@ -32,10 +33,16 @@ export default function InvoicesTable({endpoint, allowManualCreate = false}) {
 		setLoading(true);
 		try {
 			const token = localStorage.getItem('token');
-			const res = await axios.get(`${BASE_URL}${endpoint}`, {
-				headers: {Authorization: `Bearer ${token}`},
-				params: {page: currentPage, size: 10},
-			});
+			const isSearching = debouncedSearchTerm.trim().length > 0;
+			const res = await axios.get(
+				`${BASE_URL}${isSearching ? '/api/invoices/search' : endpoint}`,
+				{
+					headers: {Authorization: `Bearer ${token}`},
+					params: isSearching
+						? {q: debouncedSearchTerm.trim(), page: currentPage, size: 10}
+						: {page: currentPage, size: 10},
+				},
+			);
 			setInvoices(res.data.content ?? res.data);
 			setTotalPages(res.data.totalPages ?? 1);
 		} catch (err) {
@@ -43,7 +50,16 @@ export default function InvoicesTable({endpoint, allowManualCreate = false}) {
 		} finally {
 			setLoading(false);
 		}
-	}, [endpoint, currentPage]);
+	}, [endpoint, currentPage, debouncedSearchTerm]);
+
+	useEffect(() => {
+		const timeout = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+		return () => clearTimeout(timeout);
+	}, [searchTerm]);
+
+	useEffect(() => {
+		setCurrentPage(0);
+	}, [debouncedSearchTerm]);
 
 	useEffect(() => {
 		fetchInvoices();
@@ -74,13 +90,6 @@ export default function InvoicesTable({endpoint, allowManualCreate = false}) {
 		return 'row-produccion';
 	};
 
-	const displayedInvoices = invoices.filter((invoice) => {
-		if (!searchTerm) return true;
-		const search = searchTerm.toLowerCase();
-		return invoice.titulo?.toLowerCase().includes(search) ||
-			invoice.customerName?.toLowerCase().includes(search);
-	});
-
 	return (
 		<div className='orders-view-container'>
 			<div className='admin-tools'>
@@ -101,22 +110,22 @@ export default function InvoicesTable({endpoint, allowManualCreate = false}) {
 				{loading ? (
 					<div className='orders-loading-state'>Cargando...</div>
 				) : (
-					<table className='orders-table mobile-card-table'>
+					<table className='orders-table invoices-strip-table'>
 						<thead><tr>
 							<th>Id</th><th>Título</th><th>Cliente</th><th>Cant.</th>
 							<th>Emisión</th><th>Vencimiento</th><th>Estado</th><th>Saldo</th>
 							{canDelete && <th>Acciones</th>}
 						</tr></thead>
 						<tbody>
-							{displayedInvoices.length > 0 ? displayedInvoices.map((invoice) => (
+							{invoices.length > 0 ? invoices.map((invoice) => (
 								<tr key={invoice.id} className={getRowClass(invoice.workOrderStatus)} onClick={() => navigate(`/invoices/${invoice.id}`)}>
-									<td data-label='Id'>{invoice.id}</td>
+									<td data-label='Id' className='inv-id-cell'>{invoice.id}</td>
 									<td data-label='Titulo' className='truncate'><strong>{invoice.titulo}</strong></td>
 									<td data-label='Cliente'>{invoice.customerName || '-'}</td>
 									<td data-label='Cant.'>{invoice.cantidad || '-'}</td>
 									<td data-label='Emision'>{invoice.startDate || '-'}</td>
 									<td data-label='Vencimiento'>{invoice.fechaEntrega || invoice.fechaEstimada || '-'}</td>
-									<td data-label='Estado'><span className={`status-badge status-${(invoice.workOrderStatus || 'EN_GESTION').toLowerCase().replace(/_/g, '-')}`}>
+									<td data-label='Estado' className='inv-status-cell'><span className={`status-badge status-${(invoice.workOrderStatus || 'EN_GESTION').toLowerCase().replace(/_/g, '-')}`}>
 										{statusLabel(invoice.workOrderStatus)}
 									</span></td>
 									<td data-label='Saldo'>{formatMoney(Number(invoice.precio || 0) - Number(invoice.totalPaid || 0))}</td>

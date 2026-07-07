@@ -1,10 +1,13 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.CreateTenantRequest;
+import com.example.demo.dto.MonthlyActivityCount;
+import com.example.demo.dto.CreateTenantUserRequest;
 import com.example.demo.dto.SetTenantActiveRequest;
 import com.example.demo.dto.TenantActivityResponse;
 import com.example.demo.dto.TenantOperationalSummary;
 import com.example.demo.dto.UpdateTenantRequest;
+import com.example.demo.dto.UserSummaryDto;
 import com.example.demo.service.TenantService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,9 +44,23 @@ public class OperatorController {
         return ResponseEntity.ok(tenantService.recentActivity(id));
     }
 
+    @GetMapping("/activity/monthly")
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<MonthlyActivityCount>> activityMonthly() {
+        return ResponseEntity.ok(tenantService.activityByMonth());
+    }
+
     @PostMapping("/tenants")
     public ResponseEntity<TenantOperationalSummary> create(@RequestBody CreateTenantRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(tenantService.create(request));
+    }
+
+    @PostMapping("/tenants/{id}/users")
+    public ResponseEntity<UserSummaryDto> addUser(
+            @PathVariable Long id,
+            @RequestBody CreateTenantUserRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(tenantService.addUserToTenant(id, request));
     }
 
     @PutMapping("/tenants/{id}")

@@ -27,6 +27,9 @@ public class AppUser implements UserDetails {
     private AppUserRole appUserRole;
     private String phoneNumber;
 
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "tenant_id")
     private Tenant tenant;

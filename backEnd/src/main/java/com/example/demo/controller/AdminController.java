@@ -91,6 +91,9 @@ public class AdminController {
             return ResponseEntity.badRequest().build();
         }
         user.setPassword(passwordEncoder.encode(newPassword));
+        if (!user.getUsername().equals(currentUser.getUsername())) {
+            user.setMustChangePassword(true);
+        }
         userRepo.save(user);
         return ResponseEntity.noContent().build();
     }
