@@ -103,13 +103,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/admin/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/admin/**").hasAuthority("ADMIN")
 
-                        .requestMatchers(HttpMethod.GET, "/api/costs/**").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/costs/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/costs/**").hasAnyAuthority("ADMIN", "GESTOR")
+                        .requestMatchers(HttpMethod.POST, "/api/costs/**").hasAnyAuthority("ADMIN", "GESTOR")
                         .requestMatchers(HttpMethod.PUT, "/api/costs/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/costs/**").hasAuthority("ADMIN")
 
                         .requestMatchers("/api/finance", "/api/finance/**").hasAnyAuthority("ADMIN", "GESTOR")
                         .requestMatchers("/api/ai/**").hasAnyAuthority("ADMIN", "GESTOR")
+                        .requestMatchers(HttpMethod.POST, "/api/ledger/extract").hasAnyAuthority("ADMIN", "GESTOR")
                         .requestMatchers("/api/payment-options", "/api/payment-options/**").hasAnyAuthority("ADMIN", "GESTOR")
 
                         .requestMatchers(HttpMethod.GET, "/api/users").hasAnyAuthority("ADMIN", "SUPER_ADMIN")

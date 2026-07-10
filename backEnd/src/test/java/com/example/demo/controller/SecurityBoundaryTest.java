@@ -25,7 +25,10 @@ import java.util.Map;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -40,6 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class SecurityBoundaryTest {
     private static final String ADMIN_USERNAME = "boundary_admin";
+    private static final String GESTOR_USERNAME = "boundary_gestor";
     private static final String SUPER_USERNAME = "boundary_superadmin";
     private static final String MISASSIGNED_SUPER_USERNAME = "boundary_misassigned_superadmin";
     private static final String PASSWORD = "password123";
@@ -75,6 +79,7 @@ class SecurityBoundaryTest {
             return tenantRepo.save(created);
         });
         ensureUser(ADMIN_USERNAME, AppUserRole.ADMIN, tenant);
+        ensureUser(GESTOR_USERNAME, AppUserRole.GESTOR, tenant);
         ensureUser(SUPER_USERNAME, AppUserRole.SUPER_ADMIN, null);
         ensureUser(MISASSIGNED_SUPER_USERNAME, AppUserRole.SUPER_ADMIN, tenant);
     }
@@ -139,6 +144,45 @@ class SecurityBoundaryTest {
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/costs").header("Authorization", bearer(token)))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void unauthenticatedRequestToLedgerExtractIsRejected() throws Exception {
+        mockMvc.perform(multipart("/api/ledger/extract")
+                        .file("file", new byte[]{1}))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void gestorCanReachCostsGetAndPostButNotPutOrDelete() throws Exception {
+        String token = login(GESTOR_USERNAME);
+
+        mockMvc.perform(get("/api/costs").header("Authorization", bearer(token)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/costs")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "date", "2026-07-10",
+                                "amount", "12.34",
+                                "reason", "Test cost",
+                                "costType", "MATERIAL",
+                                "frequency", "ONE_TIME"
+                        ))))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/costs/1")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "date", "2026-07-10",
+                                "amount", "12.34",
+                                "reason", "Test cost",
+                                "costType", "MATERIAL",
+                                "frequency", "ONE_TIME"
+                        ))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/costs/1").header("Authorization", bearer(token)))
+                .andExpect(status().isForbidden());
     }
 
     @Test

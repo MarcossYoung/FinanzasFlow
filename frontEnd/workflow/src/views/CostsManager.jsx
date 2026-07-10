@@ -5,6 +5,7 @@ import {UserContext} from '../UserProvider';
 import {BASE_URL} from '../api/config';
 import StatCard from '../components/statCard';
 import ExpensePieChart from '../components/expensesPieChart';
+import LedgerAttachInput from '../components/LedgerAttachInput';
 
 const COST_TYPES = [
 	{value: 'RENT', label: 'Alquiler'},
@@ -129,6 +130,15 @@ export default function CostsManager() {
 		}
 	};
 
+	const handleExtracted = (extraction) => {
+		setFormData((prev) => ({
+			...prev,
+			date: extraction.issueDate || prev.date,
+			amount: extraction.amount ?? prev.amount,
+			reason: extraction.titulo || extraction.description || prev.reason,
+		}));
+	};
+
 	const handleDelete = async (id) => {
 		if (!window.confirm('¿Eliminar este gasto?')) return;
 		try {
@@ -246,6 +256,7 @@ export default function CostsManager() {
 						Agregar
 					</button>
 					{showManualForm && <form onSubmit={handleSubmit} className='costs-form manual-entry-form'>
+						<LedgerAttachInput onExtracted={handleExtracted} />
 						<div className='costs-form-row'>
 							<div className='input-group'>
 								<label>Fecha</label>
