@@ -33,6 +33,8 @@ public interface WorkOrderRepo extends JpaRepository<WorkOrder, Long> {
 
     Optional<WorkOrder> findByInvoice_Id(Long invoiceId);
 
+    Optional<WorkOrder> findByIdAndInvoice_Tenant_Id(Long id, Long tenantId);
+
 
     @Query("""
     SELECT COUNT(w)

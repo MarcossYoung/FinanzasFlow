@@ -85,7 +85,12 @@ export default function InvoicesTable({endpoint, allowManualCreate = false}) {
 	};
 
 	const handleStatusChange = async (invoice, status) => {
-		if (!invoice.workOrderId || status === invoice.workOrderStatus) return;
+		if (!invoice.workOrderId) {
+			console.warn('Invoice has no linked work order, cannot update status', invoice.id);
+			alert('Esta factura no tiene una orden de trabajo asociada; no se puede cambiar el estado.');
+			return;
+		}
+		if (status === invoice.workOrderStatus) return;
 		const previousStatus = invoice.workOrderStatus;
 		setInvoices((prev) =>
 			prev.map((inv) => (inv.id === invoice.id ? {...inv, workOrderStatus: status} : inv)),
