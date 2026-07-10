@@ -4,6 +4,7 @@ import {UserContext} from '../UserProvider';
 import {useNavigate} from 'react-router-dom';
 import {BASE_URL} from '../api/config';
 import CustomerPicker from '../components/CustomerPicker';
+import LedgerAttachInput from '../components/LedgerAttachInput';
 
 const emptyInvoice = {
 	titulo: '',
@@ -26,6 +27,9 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 	const [error, setError] = useState(null);
 	const [success, setSuccess] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
+	const [detectedCustomer, setDetectedCustomer] = useState(null);
+	const [selectedCustomerLabel, setSelectedCustomerLabel] = useState('');
+	const [customerPickerKey, setCustomerPickerKey] = useState(0);
 
 	const authHeaders = () => {
 		const token = user?.token || localStorage.getItem('token');
@@ -34,6 +38,7 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 
 	const handleCustomerChange = (customerId) => {
 		setInvoiceData((prev) => ({...prev, customerId: customerId || ''}));
+		if (customerId) setDetectedCustomer(null);
 	};
 
 	const handleInputChange = (e) => {
@@ -94,6 +99,68 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 		0,
 	);
 
+	const normalize = (value) => (value || '').trim().toLowerCase();
+	const normalizeTaxId = (value) => (value || '').replace(/\D/g, '');
+
+	const isStrongCustomerMatch = (customer, extraction) => {
+		const extractedName = normalize(extraction.counterpartyName);
+		const extractedTaxId = normalizeTaxId(extraction.cuitDni);
+		const customerName = normalize(customer.name);
+		const customerTaxId = normalizeTaxId(customer.cuitDni);
+		return Boolean(
+			(extractedTaxId && customerTaxId && extractedTaxId === customerTaxId) ||
+			(extractedName && customerName && extractedName === customerName),
+		);
+	};
+
+	const resolveExtractedCustomer = async (extraction) => {
+		const query = extraction.counterpartyName?.trim();
+		if (!query) {
+			setInvoiceData((prev) => ({...prev, customerId: ''}));
+			setDetectedCustomer(extraction.counterpartyName || extraction.cuitDni ? extraction : null);
+			return;
+		}
+		try {
+			const res = await axios.get(`${BASE_URL}/api/customers/search`, {
+				headers: authHeaders(),
+				params: {q: query},
+			});
+			const matches = res.data || [];
+			if (matches.length === 1 && isStrongCustomerMatch(matches[0], extraction)) {
+				setInvoiceData((prev) => ({...prev, customerId: matches[0].id}));
+				setSelectedCustomerLabel(matches[0].name || query);
+				setCustomerPickerKey((key) => key + 1);
+				setDetectedCustomer(null);
+				return;
+			}
+			setInvoiceData((prev) => ({...prev, customerId: ''}));
+			setDetectedCustomer(extraction);
+		} catch (err) {
+			console.error('Error searching extracted customer', err);
+			setInvoiceData((prev) => ({...prev, customerId: ''}));
+			setDetectedCustomer(extraction);
+		}
+	};
+
+	const handleExtracted = (extraction) => {
+		setInvoiceData((prev) => ({
+			...prev,
+			titulo: extraction.titulo || prev.titulo,
+			clientPhone: extraction.phone || prev.clientPhone,
+			startDate: extraction.issueDate || prev.startDate,
+			fechaEntrega: extraction.dueDate || prev.fechaEntrega,
+			fechaEstimada: extraction.dueDate || prev.fechaEstimada,
+			lineItems: extraction.lineItems?.length
+				? extraction.lineItems.map((li) => ({
+						description: li.description || '',
+						quantity: li.quantity ?? 1,
+						unitPrice: li.unitPrice ?? '',
+				  }))
+				: prev.lineItems,
+		}));
+		resolveExtractedCustomer(extraction);
+	};
+
 	const handleSubmit = async (e) => {
 		e.preventDefault();
 		if (submitting) return;
@@ -153,6 +220,7 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 			</div>
 
 			<form onSubmit={handleSubmit} className='creation-form'>
+				<LedgerAttachInput onExtracted={handleExtracted} disabled={submitting} />
 				<div className='input-row'>
 					<div className='input-group'>
 						<label>Titulo</label>
@@ -171,10 +239,17 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 					<div className='input-group'>
 						<label>Cliente</label>
 						<CustomerPicker
+							key={customerPickerKey}
 							value={invoiceData.customerId}
 							onChange={handleCustomerChange}
+							initialLabel={selectedCustomerLabel}
 							headers={authHeaders()}
 						/>
+						{detectedCustomer && (detectedCustomer.counterpartyName || detectedCustomer.cuitDni) && (
+							<p className='detected-customer-hint'>
+								Detectado: {[detectedCustomer.counterpartyName, detectedCustomer.cuitDni].filter(Boolean).join(' - ')}
+							</p>
+						)}
 					</div>
 					<div className='input-group'>
 						<label>Telefono de contacto</label>
