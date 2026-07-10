@@ -1884,6 +1884,31 @@ main,
 .status-en-disputa    { background-color: #fecaca; color: #991b1b; }
 .status-incobrable    { background-color: #fecdd3; color: #9f1239; }
 .status-contactado    { background-color: #e0e7ff; color: #3730a3; }
+.status-cancelado     { background-color: #e2e8f0; color: #334155; }
+
+/* Inline status dropdown — same pill look as .status-badge, plus a select affordance */
+.status-select {
+	display: inline-block;
+	padding: 3px 26px 3px 10px;
+	border-radius: 99px;
+	font-size: 0.76rem;
+	font-weight: 700;
+	white-space: nowrap;
+	letter-spacing: 0.01em;
+	border: none;
+	cursor: pointer;
+	appearance: none;
+	-webkit-appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%23334155' d='M2.5 4.5l3.5 3 3.5-3'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 8px center;
+	background-size: 10px;
+}
+
+.status-select:disabled {
+	opacity: 0.6;
+	cursor: wait;
+}
 
 /* Loader */
 .loader-layout {
