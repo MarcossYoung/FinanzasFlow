@@ -4,6 +4,7 @@ import axios from 'axios';
 import {BASE_URL} from '../api/config';
 import {UserContext} from '../UserProvider';
 import {INVOICE_STATUS_OPTIONS, STATUS_LABELS} from '../constants/invoiceStatus';
+import LedgerAttachInput from '../components/LedgerAttachInput';
 
 const formatMoney = (value) =>
 	value === null || value === undefined || value === ''
@@ -89,6 +90,10 @@ export default function InvoiceDetail() {
 		}
 	};
 
+	const handleExtracted = (extraction) => {
+		setPayment((prev) => ({...prev, amount: extraction.amount ?? prev.amount}));
+	};
+
 	if (error) return <p className='error-text'>{error}</p>;
 	if (!invoice) return <p className='invoice-detail-loading'>Cargando...</p>;
 
@@ -168,6 +173,7 @@ export default function InvoiceDetail() {
 					<>
 						<h4 className='invoice-payment-subheading'>Registrar pago</h4>
 						<form onSubmit={addPayment} className='invoice-payment-form'>
+							<LedgerAttachInput onExtracted={handleExtracted} />
 							<input
 								type='number'
 								min='0'
