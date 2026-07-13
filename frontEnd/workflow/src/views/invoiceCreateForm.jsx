@@ -103,8 +103,8 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 	const normalizeTaxId = (value) => (value || '').replace(/\D/g, '');
 
 	const isStrongCustomerMatch = (customer, extraction) => {
-		const extractedName = normalize(extraction.counterpartyName);
-		const extractedTaxId = normalizeTaxId(extraction.cuitDni);
+		const extractedName = normalize(extraction.counterpartyName || extraction.originName);
+		const extractedTaxId = normalizeTaxId(extraction.cuitDni || extraction.originTaxId);
 		const customerName = normalize(customer.name);
 		const customerTaxId = normalizeTaxId(customer.cuitDni);
 		return Boolean(
@@ -114,10 +114,15 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 	};
 
 	const resolveExtractedCustomer = async (extraction) => {
-		const query = extraction.counterpartyName?.trim();
+		// Transfer receipts don't have a single "counterparty" — the AI puts the
+		// sender's identity in originName/originTaxId instead. The origin account
+		// is the payer, i.e. the customer for a cobro.
+		const detectedName = extraction.counterpartyName || extraction.originName;
+		const detectedTaxId = extraction.cuitDni || extraction.originTaxId;
+		const query = detectedName?.trim();
 		if (!query) {
 			setInvoiceData((prev) => ({...prev, customerId: ''}));
-			setDetectedCustomer(extraction.counterpartyName || extraction.cuitDni ? extraction : null);
+			setDetectedCustomer(detectedName || detectedTaxId ? extraction : null);
 			return;
 		}
 		try {
@@ -127,7 +132,11 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 			});
 			const matches = res.data || [];
 			if (matches.length === 1 && isStrongCustomerMatch(matches[0], extraction)) {
-				setInvoiceData((prev) => ({...prev, customerId: matches[0].id}));
+				setInvoiceData((prev) => ({
+					...prev,
+					customerId: matches[0].id,
+					clientPhone: extraction.phone || matches[0].phone || prev.clientPhone,
+				}));
 				setSelectedCustomerLabel(matches[0].name || query);
 				setCustomerPickerKey((key) => key + 1);
 				setDetectedCustomer(null);
@@ -147,6 +156,7 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 			...prev,
 			titulo: extraction.titulo || prev.titulo,
 			clientPhone: extraction.phone || prev.clientPhone,
+			amount: extraction.amount ?? prev.amount,
 			startDate: extraction.issueDate || prev.startDate,
 			fechaEntrega: extraction.dueDate || prev.fechaEntrega,
 			fechaEstimada: extraction.dueDate || prev.fechaEstimada,
@@ -245,11 +255,21 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 							initialLabel={selectedCustomerLabel}
 							headers={authHeaders()}
 						/>
-						{detectedCustomer && (detectedCustomer.counterpartyName || detectedCustomer.cuitDni) && (
-							<p className='detected-customer-hint'>
-								Detectado: {[detectedCustomer.counterpartyName, detectedCustomer.cuitDni].filter(Boolean).join(' - ')}
-							</p>
-						)}
+						{detectedCustomer &&
+							(detectedCustomer.counterpartyName ||
+								detectedCustomer.cuitDni ||
+								detectedCustomer.originName ||
+								detectedCustomer.originTaxId) && (
+								<p className='detected-customer-hint'>
+									Detectado:{' '}
+									{[
+										detectedCustomer.counterpartyName || detectedCustomer.originName,
+										detectedCustomer.cuitDni || detectedCustomer.originTaxId,
+									]
+										.filter(Boolean)
+										.join(' - ')}
+								</p>
+							)}
 					</div>
 					<div className='input-group'>
 						<label>Telefono de contacto</label>
