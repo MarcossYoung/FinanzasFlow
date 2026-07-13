@@ -1063,6 +1063,26 @@ main,
 	font-size: 0.78rem;
 }
 
+.detected-customer-hint {
+	display: block;
+	margin-top: 0.25rem;
+	color: #636e72;
+	font-size: 0.78rem;
+}
+
+.detected-customer-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin-top: 0.4rem;
+}
+
+.detected-customer-actions .btn-pill {
+	height: auto;
+	padding: 0.3rem 0.9rem;
+	font-size: 0.78rem;
+}
+
 /* Mensajes de Feedback */
 .error-text {
 	color: #d63031;
