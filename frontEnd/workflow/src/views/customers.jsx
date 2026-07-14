@@ -196,7 +196,7 @@ export default function Customers() {
 					<div className='form-header'>
 						<h2>{editingId ? 'Editar Cliente' : 'Cliente'}</h2>
 						{editingId && (
-							<button type='button' className='close-x' onClick={resetForm}>
+							<button type='button' className='close-x' onClick={closeForm}>
 								<FaTimes />
 							</button>
 						)}
