@@ -30,7 +30,8 @@ public class TelegramWebhookRegistrar {
 
     @EventListener(ApplicationReadyEvent.class)
     public void registerWebhook() {
-        if (botToken == null || botToken.isBlank() || webhookUrl == null || webhookUrl.isBlank()) {
+        if (botToken == null || botToken.isBlank()
+                || webhookUrl == null || webhookUrl.isBlank()) {
             log.info("Telegram webhook registration skipped: bot token or webhook URL not configured");
             return;
         }

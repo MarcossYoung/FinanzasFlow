@@ -1,8 +1,10 @@
-import {useState, useContext, useEffect} from 'react';
+import {useState, useContext} from 'react';
 import axios from 'axios';
 import {UserContext} from '../UserProvider';
 import {useNavigate} from 'react-router-dom';
 import {BASE_URL} from '../api/config';
+import CustomerPicker from '../components/CustomerPicker';
+import LedgerAttachInput from '../components/LedgerAttachInput';
 
 const emptyInvoice = {
 	titulo: '',
@@ -15,28 +17,28 @@ const emptyInvoice = {
 	fechaEstimada: '',
 	notas: '',
 	clientPhone: '',
-	lineItems: [{description: '', quantity: 1, unitPrice: ''}],
 };
 
 const InvoiceCreateForm = ({isModal = false, onClose}) => {
 	const navigate = useNavigate();
 	const {user} = useContext(UserContext);
-	const [customers, setCustomers] = useState([]);
 	const [invoiceData, setInvoiceData] = useState(emptyInvoice);
 	const [error, setError] = useState(null);
 	const [success, setSuccess] = useState(false);
+	const [submitting, setSubmitting] = useState(false);
+	const [detectedCustomer, setDetectedCustomer] = useState(null);
+	const [selectedCustomerLabel, setSelectedCustomerLabel] = useState('');
+	const [customerPickerKey, setCustomerPickerKey] = useState(0);
 
-	useEffect(() => {
+	const authHeaders = () => {
 		const token = user?.token || localStorage.getItem('token');
-		const headers = token ? {Authorization: `Bearer ${token}`} : {};
+		return token ? {Authorization: `Bearer ${token}`} : {};
+	};
 
-		axios
-			.get(`${BASE_URL}/api/customers`, {headers})
-			.then((res) => setCustomers(res.data || []))
-			.catch((err) => {
-				console.error('Error loading customers:', err);
-			});
-	}, [user?.token]);
+	const handleCustomerChange = (customerId) => {
+		setInvoiceData((prev) => ({...prev, customerId: customerId || ''}));
+		if (customerId) setDetectedCustomer(null);
+	};
 
 	const handleInputChange = (e) => {
 		const {name, value} = e.target;
@@ -51,67 +53,102 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 		}));
 	};
 
-	const updateLineItem = (index, field, value) => {
-		setInvoiceData((prev) => ({
-			...prev,
-			lineItems: prev.lineItems.map((item, itemIndex) =>
-				itemIndex === index
-					? {
-							...item,
-							[field]:
-								field === 'description'
-									? value
-									: value === ''
-									  ? ''
-									  : Number(value),
-					  }
-					: item,
-			),
-		}));
+	const normalize = (value) =>
+		(value || '')
+			.normalize('NFD')
+			.replace(/[\u0300-\u036f]/g, '')
+			.replace(/[.,]/g, '')
+			.replace(/\s+/g, ' ')
+			.trim()
+			.toLowerCase();
+	const normalizeTaxId = (value) => (value || '').replace(/\D/g, '');
+
+	const isStrongCustomerMatch = (customer, extraction) => {
+		const extractedName = normalize(
+			extraction.counterpartyName || extraction.originName,
+		);
+		const extractedTaxId = normalizeTaxId(
+			extraction.cuitDni || extraction.originTaxId,
+		);
+		const customerName = normalize(customer.name);
+		const customerTaxId = normalizeTaxId(customer.cuitDni);
+		return Boolean(
+			(extractedTaxId && customerTaxId && extractedTaxId === customerTaxId) ||
+			(extractedName && customerName && extractedName === customerName),
+		);
 	};
 
-	const addLineItem = () => {
+	const applyCustomerMatch = (customer, extraction = detectedCustomer) => {
+		const detectedName = extraction?.counterpartyName || extraction?.originName;
 		setInvoiceData((prev) => ({
 			...prev,
-			lineItems: [
-				...prev.lineItems,
-				{description: '', quantity: 1, unitPrice: ''},
-			],
+			customerId: customer.id,
+			clientPhone: extraction?.phone || customer.phone || prev.clientPhone,
 		}));
+		setSelectedCustomerLabel(customer.name || detectedName || '');
+		setCustomerPickerKey((key) => key + 1);
+		setDetectedCustomer(null);
 	};
 
-	const removeLineItem = (index) => {
+	const resolveExtractedCustomer = async (extraction) => {
+		// Transfer receipts don't have a single "counterparty" — the AI puts the
+		// sender's identity in originName/originTaxId instead. The origin account
+		// is the payer, i.e. the customer for a cobro.
+		const detectedName = extraction.counterpartyName || extraction.originName;
+		const detectedTaxId = extraction.cuitDni || extraction.originTaxId;
+		const query = detectedName?.trim();
+		if (!query) {
+			setInvoiceData((prev) => ({...prev, customerId: ''}));
+			setDetectedCustomer(
+				detectedName || detectedTaxId ? {...extraction, candidates: []} : null,
+			);
+			return;
+		}
+		try {
+			const res = await axios.get(`${BASE_URL}/api/customers/search`, {
+				headers: authHeaders(),
+				params: {q: query},
+			});
+			const matches = res.data || [];
+			if (matches.length === 1 && isStrongCustomerMatch(matches[0], extraction)) {
+				applyCustomerMatch(matches[0], extraction);
+				return;
+			}
+			setInvoiceData((prev) => ({...prev, customerId: ''}));
+			setDetectedCustomer({...extraction, candidates: matches});
+		} catch (err) {
+			console.error('Error searching extracted customer', err);
+			setInvoiceData((prev) => ({...prev, customerId: ''}));
+			setDetectedCustomer({...extraction, candidates: []});
+		}
+	};
+
+	const handleExtracted = (extraction) => {
 		setInvoiceData((prev) => ({
 			...prev,
-			lineItems:
-				prev.lineItems.length === 1
-					? [{description: '', quantity: 1, unitPrice: ''}]
-					: prev.lineItems.filter((_, itemIndex) => itemIndex !== index),
+			titulo: extraction.titulo || prev.titulo,
+			clientPhone: extraction.phone || prev.clientPhone,
+			amount: extraction.amount ?? prev.amount,
+			precio: extraction.amount ?? prev.precio,
+			startDate: extraction.issueDate || prev.startDate,
+			fechaEntrega: extraction.dueDate || prev.fechaEntrega,
+			fechaEstimada: extraction.dueDate || prev.fechaEstimada,
 		}));
+		resolveExtractedCustomer(extraction);
 	};
-
-	const lineItemsTotal = invoiceData.lineItems.reduce(
-		(sum, item) =>
-			sum + Number(item.quantity || 0) * Number(item.unitPrice || 0),
-		0,
-	);
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
+		if (submitting) return;
+		setSubmitting(true);
 		setError(null);
 		setSuccess(false);
 
 		const token = user?.token || localStorage.getItem('token');
 		const payload = {
 			...invoiceData,
-			precio: lineItemsTotal,
-			lineItems: invoiceData.lineItems
-				.filter((item) => item.description?.trim())
-				.map((item) => ({
-					description: item.description.trim(),
-					quantity: Number(item.quantity || 0),
-					unitPrice: Number(item.unitPrice || 0),
-				})),
+			precio: Number(invoiceData.precio) || 0,
+			lineItems: [],
 			customerId: invoiceData.customerId || null,
 			amount: invoiceData.amount > 0 ? invoiceData.amount : null,
 			fechaEntrega: invoiceData.fechaEntrega || null,
@@ -136,6 +173,8 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 				err.response?.data?.message ||
 					'Error al crear la factura. Intente nuevamente.',
 			);
+		} finally {
+			setSubmitting(false);
 		}
 	};
 
@@ -151,6 +190,7 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 			</div>
 
 			<form onSubmit={handleSubmit} className='creation-form'>
+				<LedgerAttachInput onExtracted={handleExtracted} disabled={submitting} />
 				<div className='input-row'>
 					<div className='input-group'>
 						<label>Titulo</label>
@@ -168,18 +208,47 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 				<div className='input-row'>
 					<div className='input-group'>
 						<label>Cliente</label>
-						<select
-							name='customerId'
+						<CustomerPicker
+							key={customerPickerKey}
 							value={invoiceData.customerId}
-							onChange={handleInputChange}
-						>
-							<option value=''>Sin cliente asignado</option>
-							{customers.map((customer) => (
-								<option key={customer.id} value={customer.id}>
-									{customer.name}
-								</option>
-							))}
-						</select>
+							onChange={handleCustomerChange}
+							initialLabel={selectedCustomerLabel}
+							headers={authHeaders()}
+						/>
+						{detectedCustomer &&
+							(detectedCustomer.counterpartyName ||
+								detectedCustomer.cuitDni ||
+								detectedCustomer.originName ||
+								detectedCustomer.originTaxId) && (
+								<div className='detected-customer-hint'>
+									<span>
+										Detectado:{' '}
+										{[
+											detectedCustomer.counterpartyName ||
+												detectedCustomer.originName,
+											detectedCustomer.cuitDni || detectedCustomer.originTaxId,
+										]
+											.filter(Boolean)
+											.join(' - ')}
+									</span>
+									{detectedCustomer.candidates?.length > 0 && (
+										<div className='detected-customer-actions'>
+											{detectedCustomer.candidates.map((customer, index) => (
+												<button
+													key={customer.id || index}
+													type='button'
+													className='btn-pill'
+													onClick={() => applyCustomerMatch(customer)}
+												>
+													{[customer.name, customer.cuitDni]
+														.filter(Boolean)
+														.join(' - ')}
+												</button>
+											))}
+										</div>
+									)}
+								</div>
+							)}
 					</div>
 					<div className='input-group'>
 						<label>Telefono de contacto</label>
@@ -205,88 +274,17 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 							min='0'
 						/>
 					</div>
-					<div className='input-group' style={{flex: '0.5'}}>
-						<label>Cant.</label>
+					<div className='input-group'>
+						<label>Precio ($)</label>
 						<input
 							type='number'
-							name='cantidad'
-							value={invoiceData.cantidad}
+							name='precio'
+							value={invoiceData.precio}
 							onChange={handleInputChange}
 							required
-							min='1'
+							placeholder='Total de la factura'
+							min='0'
 						/>
-					</div>
-				</div>
-
-				<div className='line-items-section'>
-					<div className='line-items-header'>
-						<h3>Items</h3>
-						<button type='button' className='btn-pill' onClick={addLineItem}>
-							Agregar item
-						</button>
-					</div>
-					<div className='line-items-grid line-items-grid-header'>
-						<span>Descripcion</span>
-						<span>Cant.</span>
-						<span>Precio unit.</span>
-						<span>Subtotal</span>
-						<span></span>
-					</div>
-					{invoiceData.lineItems.map((item, index) => (
-						<div className='line-items-grid' key={index}>
-							<input
-								type='text'
-								value={item.description}
-								onChange={(e) =>
-									updateLineItem(index, 'description', e.target.value)
-								}
-								placeholder='Servicio, producto o concepto'
-								required={index === 0}
-							/>
-							<input
-								type='number'
-								min='0'
-								step='0.001'
-								value={item.quantity}
-								onChange={(e) =>
-									updateLineItem(index, 'quantity', e.target.value)
-								}
-							/>
-							<input
-								type='number'
-								min='0'
-								step='0.01'
-								value={item.unitPrice}
-								onChange={(e) =>
-									updateLineItem(index, 'unitPrice', e.target.value)
-								}
-							/>
-							<div className='line-item-subtotal'>
-								{(
-									Number(item.quantity || 0) * Number(item.unitPrice || 0)
-								).toLocaleString('es-AR', {
-									style: 'currency',
-									currency: 'ARS',
-								})}
-							</div>
-							<button
-								type='button'
-								className='line-item-remove'
-								onClick={() => removeLineItem(index)}
-								aria-label='Quitar item'
-							>
-								x
-							</button>
-						</div>
-					))}
-					<div className='line-items-total'>
-						<span>Total</span>
-						<strong>
-							{lineItemsTotal.toLocaleString('es-AR', {
-								style: 'currency',
-								currency: 'ARS',
-							})}
-						</strong>
 					</div>
 				</div>
 
@@ -324,9 +322,11 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 				<button
 					type='submit'
 					className='submit-button'
-					disabled={!invoiceData.titulo || lineItemsTotal <= 0}
+					disabled={
+						submitting || !invoiceData.titulo || Number(invoiceData.precio) <= 0
+					}
 				>
-					Guardar Factura
+					{submitting ? 'Guardando...' : 'Guardar Factura'}
 				</button>
 
 				{error && <p className='error-text'>{error}</p>}

@@ -2,6 +2,7 @@ package com.example.demo.config;
 
 import com.example.demo.service.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -22,6 +23,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -30,14 +32,20 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final PasswordChangeRequiredFilter passwordChangeRequiredFilter;
     private final CustomUserDetailsService customUserDetailsService;
     private final PasswordEncoder passwordEncoder;
 
+    @Value("${cors.allowed-origins:http://localhost:3000}")
+    private String allowedOriginsRaw;
+
     @Autowired
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          PasswordChangeRequiredFilter passwordChangeRequiredFilter,
                           CustomUserDetailsService customUserDetailsService,
                           PasswordEncoder passwordEncoder) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.passwordChangeRequiredFilter = passwordChangeRequiredFilter;
         this.customUserDetailsService = customUserDetailsService;
         this.passwordEncoder = passwordEncoder;
     }
@@ -76,7 +84,7 @@ public class SecurityConfig {
 
                         // Existing public paths
                         .requestMatchers("/api/users/login").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/users/registro").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/users/registro").hasAuthority("SUPER_ADMIN")
                         .requestMatchers("/api/payments", "/api/payments/**").hasAnyAuthority("ADMIN", "GESTOR")
                         .requestMatchers("/api/workorders", "/api/workorders/**").hasAnyAuthority("ADMIN", "GESTOR")
 
@@ -95,18 +103,19 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/admin/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/admin/**").hasAuthority("ADMIN")
 
-                        .requestMatchers(HttpMethod.GET, "/api/costs/**").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/costs/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/costs/**").hasAnyAuthority("ADMIN", "GESTOR")
+                        .requestMatchers(HttpMethod.POST, "/api/costs/**").hasAnyAuthority("ADMIN", "GESTOR")
                         .requestMatchers(HttpMethod.PUT, "/api/costs/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/costs/**").hasAuthority("ADMIN")
 
                         .requestMatchers("/api/finance", "/api/finance/**").hasAnyAuthority("ADMIN", "GESTOR")
                         .requestMatchers("/api/ai/**").hasAnyAuthority("ADMIN", "GESTOR")
+                        .requestMatchers(HttpMethod.POST, "/api/ledger/extract").hasAnyAuthority("ADMIN", "GESTOR")
                         .requestMatchers("/api/payment-options", "/api/payment-options/**").hasAnyAuthority("ADMIN", "GESTOR")
 
                         .requestMatchers(HttpMethod.GET, "/api/users").hasAnyAuthority("ADMIN", "SUPER_ADMIN")
 
-                        .requestMatchers("/api/users/profile/**", "/api/workOrders/**").authenticated()
+                        .requestMatchers("/api/users/profile/**").authenticated()
 
                         // Ensure all other paths are secured (Fixing the previous issue I pointed out)
                         .anyRequest().authenticated()
@@ -114,6 +123,7 @@ public class SecurityConfig {
 
                 // Register JWT filter
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(passwordChangeRequiredFilter, JwtAuthenticationFilter.class)
 
                 // Allow H2 console iframe
                 .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin));
@@ -125,11 +135,11 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOriginPatterns(List.of(
-                "http://localhost:*",
-                "https://finanzasdashboard.netlify.app",
-                "https://**--finanzasdashboard.netlify.app"
-        ));
+        List<String> origins = Arrays.stream(allowedOriginsRaw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .toList();
+        config.setAllowedOriginPatterns(origins);
 
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));

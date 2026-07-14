@@ -26,5 +26,5 @@ public interface CustomerRepo extends JpaRepository<Customer, Long> {
             """)
     List<Customer> search(@Param("tenantId") Long tenantId, @Param("q") String q);
 
-    Optional<Customer> findByPhone(String phone);
+    List<Customer> findByPhone(String phone);
 }

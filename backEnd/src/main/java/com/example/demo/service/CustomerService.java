@@ -76,10 +76,7 @@ public class CustomerService {
     private Long tenantId() {
         Long tenantId = TenantContext.get();
         if (tenantId != null) return tenantId;
-        return tenantRepo.findBySlug("muebleria-demo").map(Tenant::getId)
-                .orElseGet(() -> tenantRepo.findAll().stream().findFirst()
-                        .map(Tenant::getId)
-                        .orElseThrow(() -> new RuntimeException("No tenant available")));
+        throw new RuntimeException("Tenant not available");
     }
 
     private Tenant tenant() {

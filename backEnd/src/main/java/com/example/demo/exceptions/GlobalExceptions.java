@@ -6,6 +6,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.util.HashMap;
@@ -30,6 +32,66 @@ public class GlobalExceptions {
         response.put("error", ex.getMessage());
         response.put("status", HttpStatus.CONFLICT.value());
         return new ResponseEntity<>(response, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", ex.getMessage());
+        response.put("status", HttpStatus.BAD_REQUEST.value());
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(AiServiceException.class)
+    public ResponseEntity<Map<String, Object>> handleAiServiceException(AiServiceException ex) {
+        HttpStatus status;
+        String message;
+        switch (ex.getReason()) {
+            case NOT_CONFIGURED -> {
+                status = HttpStatus.SERVICE_UNAVAILABLE;
+                message = "IA no configurada.";
+            }
+            case HTTP_ERROR -> {
+                status = HttpStatus.BAD_GATEWAY;
+                message = "Error al contactar el servicio de IA.";
+            }
+            case EMPTY_RESPONSE, INVALID_JSON -> {
+                status = HttpStatus.UNPROCESSABLE_ENTITY;
+                message = "No se pudieron extraer datos del documento. Proba con una imagen mas clara.";
+            }
+            default -> {
+                status = HttpStatus.INTERNAL_SERVER_ERROR;
+                message = "An internal error occurred!";
+            }
+        }
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", message);
+        response.put("status", status.value());
+        return new ResponseEntity<>(response, status);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "El archivo es demasiado grande (maximo 10MB).");
+        response.put("status", HttpStatus.PAYLOAD_TOO_LARGE.value());
+        return new ResponseEntity<>(response, HttpStatus.PAYLOAD_TOO_LARGE);
+    }
+
+    @ExceptionHandler(AiSpendLimitExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleAiSpendLimitExceeded(AiSpendLimitExceededException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "Se alcanzo el limite de uso de IA para este mes.");
+        response.put("status", HttpStatus.TOO_MANY_REQUESTS.value());
+        return new ResponseEntity<>(response, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "Invalid value for parameter '" + ex.getName() + "': " + ex.getValue());
+        response.put("status", HttpStatus.BAD_REQUEST.value());
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(NoHandlerFoundException.class)

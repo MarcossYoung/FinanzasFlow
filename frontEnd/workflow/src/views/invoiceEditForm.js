@@ -4,25 +4,24 @@ import axios from 'axios';
 import {BASE_URL} from '../api/config';
 import {UserContext} from '../UserProvider';
 import {INVOICE_STATUS_OPTIONS} from '../constants/invoiceStatus';
+import CustomerPicker from '../components/CustomerPicker';
 
 export default function InvoiceEditForm() {
 	const {invoiceId} = useParams();
 	const navigate = useNavigate();
 	const {user} = useContext(UserContext);
-	const [customers, setCustomers] = useState([]);
 	const [invoice, setInvoice] = useState(null);
 	const [error, setError] = useState(null);
 	const [submitting, setSubmitting] = useState(false);
 
-	useEffect(() => {
+	const authHeaders = () => {
 		const token = user?.token || localStorage.getItem('token');
-		const headers = token ? {Authorization: `Bearer ${token}`} : {};
+		return token ? {Authorization: `Bearer ${token}`} : {};
+	};
 
-		Promise.all([
-			axios.get(`${BASE_URL}/api/invoices/${invoiceId}`, {headers}),
-			axios.get(`${BASE_URL}/api/customers`, {headers}).catch(() => ({data: []})),
-		])
-			.then(([invoiceRes, customersRes]) => {
+	useEffect(() => {
+		axios.get(`${BASE_URL}/api/invoices/${invoiceId}`, {headers: authHeaders()})
+			.then((invoiceRes) => {
 				const rows = invoiceRes.data.lineItems?.length
 					? invoiceRes.data.lineItems
 					: [
@@ -39,13 +38,17 @@ export default function InvoiceEditForm() {
 					fechaEstimada: invoiceRes.data.fechaEstimada || '',
 					lineItems: rows,
 				});
-				setCustomers(customersRes.data || []);
 			})
 			.catch((err) => {
 				console.error(err);
 				setError('No se pudo cargar la factura.');
 			});
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [invoiceId, user?.token]);
+
+	const handleCustomerChange = (customerId) => {
+		setInvoice((prev) => ({...prev, customerId: customerId || ''}));
+	};
 
 	const handleChange = (e) => {
 		const {name, value} = e.target;
@@ -191,12 +194,12 @@ export default function InvoiceEditForm() {
 				<div className='input-row'>
 					<div className='input-group'>
 						<label>Cliente</label>
-						<select name='customerId' value={invoice.customerId || ''} onChange={handleChange}>
-							<option value=''>Sin cliente asignado</option>
-							{customers.map((customer) => (
-								<option key={customer.id} value={customer.id}>{customer.name}</option>
-							))}
-						</select>
+						<CustomerPicker
+							value={invoice.customerId}
+							onChange={handleCustomerChange}
+							initialLabel={invoice.customerName || ''}
+							headers={authHeaders()}
+						/>
 					</div>
 					<div className='input-group'>
 						<label>Telefono de contacto</label>

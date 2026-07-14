@@ -2,8 +2,10 @@ package com.example.demo.service;
 
 import com.example.demo.dto.FinanceDashboardResponse;
 import com.example.demo.dto.InvoiceResponse;
+import com.example.demo.dto.AiUsage;
 import com.example.demo.dto.LedgerLineItemExtraction;
 import com.example.demo.dto.LedgerExtraction;
+import com.example.demo.dto.LedgerExtractionResult;
 import com.example.demo.exceptions.AiServiceException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -41,6 +43,8 @@ public class AiService {
 
     private static final String ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
     private static final String MODEL = "claude-haiku-4-5-20251001";
+    private record AnthropicCallResult(String text, AiUsage usage) {}
+
     private static final String LEDGER_EXTRACTION_SYSTEM = """
             Eres un extractor de documentos contables para FinanzasFlow.
             Extrae datos sin decidir si el documento es un cobro o un gasto.
@@ -67,6 +71,10 @@ public class AiService {
     }
 
     private String postToAnthropic(Map<String, Object> body) {
+        return postToAnthropicInternal(body).text();
+    }
+
+    private AnthropicCallResult postToAnthropicInternal(Map<String, Object> body) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new AiServiceException(AiServiceException.Reason.NOT_CONFIGURED, "Anthropic is not configured");
         }
@@ -93,11 +101,12 @@ public class AiService {
                 throw new AiServiceException(AiServiceException.Reason.EMPTY_RESPONSE, "Anthropic returned an empty response");
             }
             Map<String, Object> parsed = objectMapper.readValue(responseHolder[0], new TypeReference<>() {});
+            AiUsage usage = usageFrom(parsed.get("usage"));
             List<?> content = (List<?>) parsed.get("content");
             if (content != null && !content.isEmpty()) {
                 for (Object block : content) {
                     if (block instanceof Map<?, ?> item && "text".equals(item.get("type")) && item.get("text") instanceof String text) {
-                        return text;
+                        return new AnthropicCallResult(text, usage);
                     }
                 }
             }
@@ -107,6 +116,17 @@ public class AiService {
         } catch (Exception e) {
             throw new AiServiceException(AiServiceException.Reason.HTTP_ERROR, "Anthropic request failed", e);
         }
+    }
+
+    private AiUsage usageFrom(Object rawUsage) {
+        if (!(rawUsage instanceof Map<?, ?> usage)) {
+            return new AiUsage(0, 0);
+        }
+        return new AiUsage(longValue(usage.get("input_tokens")), longValue(usage.get("output_tokens")));
+    }
+
+    private long longValue(Object value) {
+        return value instanceof Number number ? number.longValue() : 0;
     }
 
     private Map<String, Object> textBody(String systemPrompt, Object content, int maxTokens) {
@@ -130,6 +150,11 @@ public class AiService {
 
     public String callClaudeVision(String systemPrompt, byte[] fileBytes, String mediaType,
                                    String userText, int maxTokens) {
+        return postToAnthropic(buildVisionBody(systemPrompt, fileBytes, mediaType, userText, maxTokens));
+    }
+
+    private Map<String, Object> buildVisionBody(String systemPrompt, byte[] fileBytes, String mediaType,
+                                                String userText, int maxTokens) {
         String blockType = "application/pdf".equals(mediaType) ? "document" : "image";
         Map<String, Object> source = Map.of(
                 "type", "base64",
@@ -141,7 +166,7 @@ public class AiService {
                 Map.of("type", "text", "text", userText == null || userText.isBlank()
                         ? "Extrae los datos contables de este documento." : userText)
         );
-        return postToAnthropic(textBody(systemPrompt, content, maxTokens));
+        return textBody(systemPrompt, content, maxTokens);
     }
 
     private Map<String, Object> callClaudeForJson(String systemPrompt, String userMessage, int maxTokens) {
@@ -293,6 +318,24 @@ public class AiService {
                         : "Contexto del usuario: " + caption,
                 500
         );
+    }
+
+    public LedgerExtractionResult parseLedgerMediaFromBytesWithUsage(byte[] bytes, String mediaType, String caption) {
+        if (bytes == null || bytes.length == 0) {
+            throw new AiServiceException(AiServiceException.Reason.INVALID_JSON, "Ledger media is empty");
+        }
+        Map<String, Object> body = buildVisionBody(
+                LEDGER_EXTRACTION_SYSTEM,
+                bytes,
+                mediaType,
+                caption == null || caption.isBlank()
+                        ? "Extrae los datos contables de este documento."
+                        : "Contexto del usuario: " + caption,
+                500
+        );
+        AnthropicCallResult result = postToAnthropicInternal(body);
+        LedgerExtraction extraction = parseLedgerJson(result.text());
+        return new LedgerExtractionResult(extraction, result.usage());
     }
 
     public LedgerExtraction parseLedgerExtraction(String raw) {

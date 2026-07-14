@@ -5,6 +5,7 @@ import {UserContext} from '../UserProvider';
 import {BASE_URL} from '../api/config';
 import StatCard from '../components/statCard';
 import ExpensePieChart from '../components/expensesPieChart';
+import LedgerAttachInput from '../components/LedgerAttachInput';
 
 const COST_TYPES = [
 	{value: 'RENT', label: 'Alquiler'},
@@ -129,6 +130,15 @@ export default function CostsManager() {
 		}
 	};
 
+	const handleExtracted = (extraction) => {
+		setFormData((prev) => ({
+			...prev,
+			date: extraction.issueDate || prev.date,
+			amount: extraction.amount ?? prev.amount,
+			reason: extraction.titulo || extraction.description || prev.reason,
+		}));
+	};
+
 	const handleDelete = async (id) => {
 		if (!window.confirm('¿Eliminar este gasto?')) return;
 		try {
@@ -239,13 +249,14 @@ export default function CostsManager() {
 				<div className='panel manual-entry-panel'>
 					<button
 						type='button'
-						className='manual-entry-disclosure'
+						className='button-green manual-entry-disclosure'
 						onClick={() => setShowManualForm((visible) => !visible)}
 						aria-expanded={showManualForm}
 					>
-						Agregar o corregir manualmente
+						Agregar
 					</button>
 					{showManualForm && <form onSubmit={handleSubmit} className='costs-form manual-entry-form'>
+						<LedgerAttachInput onExtracted={handleExtracted} />
 						<div className='costs-form-row'>
 							<div className='input-group'>
 								<label>Fecha</label>
@@ -297,7 +308,7 @@ export default function CostsManager() {
 				<div className='costs-table-header'>
 					<h3 className='card-section-title'>Gastos del Período</h3>
 				</div>
-				<table className='orders-table'>
+				<table className='orders-table mobile-card-table'>
 					<thead>
 						<tr>
 							<th>Fecha</th>
@@ -315,22 +326,22 @@ export default function CostsManager() {
 							costs.map((c) =>
 								editingId === c.id ? (
 									<tr key={c.id} className='table-edit-row'>
-										<td><input type='date' value={editForm.date}
+										<td data-label='Fecha'><input type='date' value={editForm.date}
 											onChange={(e) => setEditForm({...editForm, date: e.target.value})}
 											className='table-edit-input' /></td>
-										<td><input type='text' value={editForm.reason}
+										<td data-label='Asunto'><input type='text' value={editForm.reason}
 											onChange={(e) => setEditForm({...editForm, reason: e.target.value})}
 											className='table-edit-input' /></td>
-										<td>
+										<td data-label='Tipo'>
 											<select value={editForm.costType}
 												onChange={(e) => setEditForm({...editForm, costType: e.target.value})}>
 												{COST_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
 											</select>
 										</td>
-										<td><input type='number' value={editForm.amount}
+										<td data-label='Monto'><input type='number' value={editForm.amount}
 											onChange={(e) => setEditForm({...editForm, amount: e.target.value})}
 											className='table-edit-input' /></td>
-										<td>
+										<td data-label='Frecuencia'>
 											<select value={editForm.frequency}
 												onChange={(e) => setEditForm({...editForm, frequency: e.target.value})}>
 												<option value='ONE_TIME'>Única vez</option>
@@ -339,7 +350,7 @@ export default function CostsManager() {
 												<option value='YEARLY'>Anual</option>
 											</select>
 										</td>
-										<td className='text-center'>
+										<td className='text-center' data-label='Acciones'>
 											<div className='table-actions centered'>
 												<button className='button-green' onClick={() => saveEdit(c.id)}>Guardar</button>
 												<button className='btn-delete' onClick={() => setEditingId(null)}>Cancelar</button>
@@ -348,21 +359,21 @@ export default function CostsManager() {
 									</tr>
 								) : (
 									<tr key={c.id}>
-										<td>{c.date}</td>
-										<td>
+										<td data-label='Fecha'>{c.date}</td>
+										<td data-label='Asunto'>
 											{c.reason || '-'}
 											{c.reason?.endsWith('(Auto)') && <span className='auto-recurring-icon'>🔁</span>}
 										</td>
-										<td><span className='cost-type-badge'>{typeLabel(c.costType)}</span></td>
-										<td className='amount-cell'>{formatMoney(c.amount)}</td>
-										<td>
+										<td data-label='Tipo'><span className='cost-type-badge'>{typeLabel(c.costType)}</span></td>
+										<td className='amount-cell' data-label='Monto'>{formatMoney(c.amount)}</td>
+										<td data-label='Frecuencia'>
 											{c.frequency !== 'ONE_TIME' ? (
 												<span className='freq-badge'>
 													{freqLabel(c.frequency)}
 												</span>
 											) : 'Única vez'}
 										</td>
-										<td className='text-center'>
+										<td className='text-center' data-label='Acciones'>
 											<div className='table-actions centered'>
 												<button className='btn-pill'
 													onClick={() => startEdit(c)}>Editar</button>

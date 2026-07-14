@@ -27,5 +27,7 @@
       "Bash(Get-Content \"C:\\\\Users\\\\marco\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-marco-Dev-Projects-MueblesWorkFlow\\\\41ad2eaf-1bc4-4b96-8148-be202f797bb3\\\\tasks\\\\bmpecua7g.output\")",
       "Bash(Select-Object -Last 30)"
     ]
-  }
+  },
+  "prefersReducedMotion": false,
+  "outputStyle": "default"
 }

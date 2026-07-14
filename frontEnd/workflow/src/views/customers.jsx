@@ -1,8 +1,10 @@
-import {useCallback, useContext, useEffect, useMemo, useState} from 'react';
+import {useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
 import axios from 'axios';
-import {FaEdit, FaPlus, FaSearch, FaTimes, FaTrashAlt} from 'react-icons/fa';
+import {FaChevronLeft, FaChevronRight, FaEdit, FaPlus, FaSearch, FaTimes, FaTrashAlt} from 'react-icons/fa';
 import {BASE_URL} from '../api/config';
 import {UserContext} from '../UserProvider';
+
+const PAGE_SIZE = 10;
 
 const emptyCustomer = {
 	name: '',
@@ -19,10 +21,15 @@ export default function Customers() {
 	const [form, setForm] = useState(emptyCustomer);
 	const [editingId, setEditingId] = useState(null);
 	const [searchTerm, setSearchTerm] = useState('');
+	const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+	const [currentPage, setCurrentPage] = useState(0);
 	const [loading, setLoading] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState('');
 	const [success, setSuccess] = useState('');
+	const [formOpen, setFormOpen] = useState(false);
+	const formPanelRef = useRef(null);
+	const nameInputRef = useRef(null);
 
 	const authHeaders = useCallback(() => {
 		const token = user?.token || localStorage.getItem('token');
@@ -33,12 +40,12 @@ export default function Customers() {
 		setLoading(true);
 		setError('');
 		try {
-			const endpoint = searchTerm.trim()
+			const endpoint = debouncedSearchTerm.trim()
 				? `${BASE_URL}/api/customers/search`
 				: `${BASE_URL}/api/customers`;
 			const res = await axios.get(endpoint, {
 				headers: authHeaders(),
-				params: searchTerm.trim() ? {q: searchTerm.trim()} : {},
+				params: debouncedSearchTerm.trim() ? {q: debouncedSearchTerm.trim()} : {},
 			});
 			setCustomers(res.data || []);
 		} catch (err) {
@@ -47,13 +54,32 @@ export default function Customers() {
 		} finally {
 			setLoading(false);
 		}
-	}, [authHeaders, searchTerm]);
+	}, [authHeaders, debouncedSearchTerm]);
+
+	useEffect(() => {
+		const timeout = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+		return () => clearTimeout(timeout);
+	}, [searchTerm]);
+
+	useEffect(() => {
+		setCurrentPage(0);
+	}, [debouncedSearchTerm]);
 
 	useEffect(() => {
 		fetchCustomers();
 	}, [fetchCustomers]);
 
-	const filteredCustomers = useMemo(() => customers, [customers]);
+	useEffect(() => {
+		if (!formOpen) return;
+		formPanelRef.current?.scrollIntoView({behavior: 'smooth', block: 'start'});
+		nameInputRef.current?.focus({preventScroll: true});
+	}, [formOpen]);
+
+	const totalPages = Math.max(1, Math.ceil(customers.length / PAGE_SIZE));
+	const pagedCustomers = useMemo(
+		() => customers.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE),
+		[customers, currentPage],
+	);
 
 	const handleChange = (e) => {
 		const {name, value} = e.target;
@@ -63,10 +89,20 @@ export default function Customers() {
 		}));
 	};
 
-	const resetForm = () => {
+	const resetForm = (open = false) => {
 		setForm(emptyCustomer);
 		setEditingId(null);
 		setError('');
+		setFormOpen(open);
+	};
+
+	const openNewCustomer = () => {
+		setSuccess('');
+		resetForm(true);
+	};
+
+	const closeForm = () => {
+		resetForm(false);
 	};
 
 	const startEdit = (customer) => {
@@ -81,6 +117,7 @@ export default function Customers() {
 		});
 		setSuccess('');
 		setError('');
+		setFormOpen(true);
 	};
 
 	const handleSubmit = async (e) => {
@@ -110,7 +147,7 @@ export default function Customers() {
 				});
 				setSuccess('Cliente creado.');
 			}
-			resetForm();
+			resetForm(false);
 			fetchCustomers();
 		} catch (err) {
 			console.error(err);
@@ -131,7 +168,7 @@ export default function Customers() {
 			await axios.delete(`${BASE_URL}/api/customers/${customer.id}`, {
 				headers: authHeaders(),
 			});
-			if (editingId === customer.id) resetForm();
+			if (editingId === customer.id) resetForm(false);
 			setSuccess('Cliente eliminado.');
 			fetchCustomers();
 		} catch (err) {
@@ -152,7 +189,10 @@ export default function Customers() {
 			</div>
 
 			<div className='customers-layout'>
-				<section className='customer-form-panel'>
+				<section
+					ref={formPanelRef}
+					className={`customer-form-panel${formOpen ? ' is-open' : ''}`}
+				>
 					<div className='form-header'>
 						<h2>{editingId ? 'Editar Cliente' : 'Cliente'}</h2>
 						{editingId && (
@@ -165,6 +205,7 @@ export default function Customers() {
 						<div className='input-group'>
 							<label>Nombre</label>
 							<input
+								ref={nameInputRef}
 								name='name'
 								value={form.name}
 								onChange={handleChange}
@@ -237,8 +278,8 @@ export default function Customers() {
 								placeholder='Buscar por nombre, email, telefono o CUIT'
 							/>
 						</div>
-						<button className='btn-pill' type='button' onClick={resetForm}>
-							<FaPlus /> Nuevo
+						<button className='btn-pill' type='button' onClick={openNewCustomer}>
+							<FaPlus /> Nuevo cliente
 						</button>
 					</div>
 
@@ -246,7 +287,7 @@ export default function Customers() {
 					{success && <p className='success-text'>{success}</p>}
 
 					<div className='table-wrapper customers-table-wrapper'>
-						<table className='orders-table customers-table'>
+						<table className='orders-table customers-table mobile-card-table'>
 							<thead>
 								<tr>
 									<th>Cliente</th>
@@ -263,24 +304,24 @@ export default function Customers() {
 											Cargando clientes...
 										</td>
 									</tr>
-								) : filteredCustomers.length ? (
-									filteredCustomers.map((customer) => (
+								) : pagedCustomers.length ? (
+									pagedCustomers.map((customer) => (
 										<tr key={customer.id}>
-											<td>
+											<td data-label='Cliente'>
 												<strong>{customer.name}</strong>
 												{customer.notes && <small>{customer.notes}</small>}
 											</td>
-											<td>
+											<td data-label='Contacto'>
 												<span>{customer.email || '-'}</span>
 												<small>{customer.phone || '-'}</small>
 											</td>
-											<td>{customer.cuitDni || '-'}</td>
-											<td>
+											<td data-label='CUIT / DNI'>{customer.cuitDni || '-'}</td>
+											<td data-label='Score'>
 												<span className='score-pill'>
 													{customer.paymentScore ?? 100}
 												</span>
 											</td>
-											<td>
+											<td data-label='Acciones'>
 												<div className='table-actions'>
 													<button
 														type='button'
@@ -311,6 +352,20 @@ export default function Customers() {
 								)}
 							</tbody>
 						</table>
+					</div>
+
+					<div className='pagination-controls'>
+						<button disabled={currentPage === 0} onClick={() => setCurrentPage((p) => p - 1)}
+							className='btn-pagination'>
+							<FaChevronLeft /> Anterior
+						</button>
+						<span className='pagination-current'>
+							Página {currentPage + 1} de {totalPages}
+						</span>
+						<button disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage((p) => p + 1)}
+							className='btn-pagination'>
+							Siguiente <FaChevronRight />
+						</button>
 					</div>
 				</section>
 			</div>

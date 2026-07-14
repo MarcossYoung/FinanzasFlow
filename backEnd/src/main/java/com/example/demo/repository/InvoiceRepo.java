@@ -57,7 +57,8 @@ public interface InvoiceRepo extends JpaRepository<Invoice, Long> {
 
     List<Invoice> findByFechaEstimadaBetween(LocalDate today, LocalDate endOfWeek);
 
-    List<Invoice> findByFechaEstimadaBetweenAndTenant_Id(LocalDate today, LocalDate endOfWeek, Long tenantId);
+    List<Invoice> findTop200ByFechaEstimadaBetweenAndTenant_IdOrderByFechaEstimadaAsc(
+            LocalDate today, LocalDate endOfWeek, Long tenantId);
 
     List<Invoice> findByStartDateBetween(LocalDate from, LocalDate to);
 
@@ -90,17 +91,7 @@ public interface InvoiceRepo extends JpaRepository<Invoice, Long> {
 
    List<Invoice> findByWorkOrderStatus(Status status);
 
-   List<Invoice> findByWorkOrderStatusAndTenant_Id(Status status, Long tenantId);
-
-   @Query("""
-           SELECT p FROM Invoice p
-           LEFT JOIN FETCH p.customer c
-           LEFT JOIN FETCH p.workOrder wo
-           WHERE COALESCE(p.fechaEntrega, p.fechaEstimada) < :today
-           AND (wo IS NULL OR wo.status <> com.example.demo.model.Status.CERRADO)
-           ORDER BY COALESCE(p.fechaEntrega, p.fechaEstimada) ASC
-           """)
-   List<Invoice> findOverdueOpenInvoices(@Param("today") LocalDate today);
+   List<Invoice> findTop200ByWorkOrderStatusAndTenant_IdOrderByIdDesc(Status status, Long tenantId);
 
    @Query("""
            SELECT p FROM Invoice p

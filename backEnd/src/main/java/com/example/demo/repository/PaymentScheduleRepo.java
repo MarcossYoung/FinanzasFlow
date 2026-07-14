@@ -13,9 +13,6 @@ public interface PaymentScheduleRepo extends JpaRepository<PaymentSchedule, Long
     List<PaymentSchedule> findByTenant_IdAndStatusAndExpectedDateBetween(
             Long tenantId, ScheduleStatus status, LocalDate from, LocalDate to);
 
-    List<PaymentSchedule> findByStatusAndExpectedDateBetween(
-            ScheduleStatus status, LocalDate from, LocalDate to);
-
     List<PaymentSchedule> findByTenant_IdAndExpectedDate(Long tenantId, LocalDate expectedDate);
 
     @Query("""
