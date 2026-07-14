@@ -34,6 +34,8 @@ public class FinanceService {
         Long tenantId = currentTenantId();
         List<Invoice> invoices = InvoiceRepository.findByStartDateBetweenAndTenant_Id(from, to, tenantId);
         List<OrderPayments> payments = paymentRepository.findByPaymentDateBetweenAndTenant_Id(from, to, tenantId);
+        List<Invoice> invoicesToDate = InvoiceRepository.findByStartDateLessThanEqualAndTenant_Id(to, tenantId);
+        List<OrderPayments> paymentsToDate = paymentRepository.findByPaymentDateLessThanEqualAndTenant_Id(to, tenantId);
         List<Costs> allCosts = costsRepository.findByDateBetweenAndTenant_Id(from, to, tenantId);
 
         Map<String, BigDecimal> breakdownMap = allCosts.stream()
@@ -66,6 +68,15 @@ public class FinanceService {
                 .map(OrderPayments::getAmount)
                 .map(FinanceService::nz)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal tIncToDate = invoicesToDate.stream()
+                .map(Invoice::getPrecio)
+                .map(FinanceService::nz)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal tDepToDate = paymentsToDate.stream()
+                .map(OrderPayments::getAmount)
+                .map(FinanceService::nz)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal pendienteCobro = tIncToDate.subtract(tDepToDate).max(BigDecimal.ZERO);
         BigDecimal tCogs = BigDecimal.ZERO;
         BigDecimal grossProfit = tInc;
         BigDecimal netProfit = tInc.subtract(tExp);
@@ -82,7 +93,8 @@ public class FinanceService {
                 tCogs,
                 grossProfit,
                 netProfit,
-                customerStats
+                customerStats,
+                pendienteCobro
         );
     }
 

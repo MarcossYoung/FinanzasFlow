@@ -194,9 +194,9 @@ export default function Customers() {
 					className={`customer-form-panel${formOpen ? ' is-open' : ''}`}
 				>
 					<div className='form-header'>
-						<h2>{editingId ? 'Editar Cliente' : 'Nuevo Cliente'}</h2>
-						{(editingId || formOpen) && (
-							<button type='button' className='close-x' onClick={closeForm}>
+						<h2>{editingId ? 'Editar Cliente' : 'Cliente'}</h2>
+						{editingId && (
+							<button type='button' className='close-x' onClick={resetForm}>
 								<FaTimes />
 							</button>
 						)}

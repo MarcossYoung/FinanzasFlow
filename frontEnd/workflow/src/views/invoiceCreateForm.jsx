@@ -181,7 +181,7 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 	return (
 		<div className={`product-creation-container ${isModal ? 'is-modal' : ''}`}>
 			<div className='form-header'>
-				<h2>{isModal ? 'Nueva Factura' : 'Crear Factura'}</h2>
+				<h2>{isModal ? 'Factura' : 'Crear Factura'}</h2>
 				{isModal && (
 					<button className='close-x' onClick={onClose} type='button'>
 						&times;

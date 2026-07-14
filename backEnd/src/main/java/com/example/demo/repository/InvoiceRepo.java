@@ -64,6 +64,8 @@ public interface InvoiceRepo extends JpaRepository<Invoice, Long> {
 
     List<Invoice> findByStartDateBetweenAndTenant_Id(LocalDate from, LocalDate to, Long tenantId);
 
+   List<Invoice> findByStartDateLessThanEqualAndTenant_Id(LocalDate to, Long tenantId);
+
    Page<Invoice> findByTenant_Id(Long tenantId, Pageable pageable);
 
    Optional<Invoice> findByIdAndTenant_Id(Long id, Long tenantId);

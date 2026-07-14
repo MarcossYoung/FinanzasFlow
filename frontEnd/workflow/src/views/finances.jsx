@@ -176,7 +176,7 @@ export default function Finance() {
 					<StatCard title='Efectivo Recibido' value={financeData.tDep}borderColor='#636e72' />
 					<StatCard
 						title='Pendiente de Cobro'
-						value={Number(financeData.tInc || 0) - Number(financeData.tDep || 0)}
+						value={financeData.pendienteCobro}
 						
 						borderColor='#e17055'
 					/>
