@@ -95,6 +95,7 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 		// sender's identity in originName/originTaxId instead. The origin account
 		// is the payer, i.e. the customer for a cobro.
 		const detectedName = extraction.counterpartyName || extraction.originName;
+		const detectedNameForLabel = detectedName || '';
 		const detectedTaxId = extraction.cuitDni || extraction.originTaxId;
 		const query = detectedName?.trim();
 		if (!query) {
@@ -116,10 +117,12 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 			}
 			setInvoiceData((prev) => ({...prev, customerId: ''}));
 			setDetectedCustomer({...extraction, candidates: matches});
+			setSelectedCustomerLabel(detectedNameForLabel);
 		} catch (err) {
 			console.error('Error searching extracted customer', err);
 			setInvoiceData((prev) => ({...prev, customerId: ''}));
 			setDetectedCustomer({...extraction, candidates: []});
+			setSelectedCustomerLabel(detectedNameForLabel);
 		}
 	};
 
