@@ -154,7 +154,7 @@ export default function Customers() {
 			<div className='customers-layout'>
 				<section className='customer-form-panel'>
 					<div className='form-header'>
-						<h2>{editingId ? 'Editar Cliente' : 'Nuevo Cliente'}</h2>
+						<h2>{editingId ? 'Editar Cliente' : 'Cliente'}</h2>
 						{editingId && (
 							<button type='button' className='close-x' onClick={resetForm}>
 								<FaTimes />

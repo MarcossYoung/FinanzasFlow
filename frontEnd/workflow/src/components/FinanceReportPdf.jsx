@@ -77,11 +77,10 @@ export default function FinanceReportPdf({
 	selectedMonth,
 	userName,
 }) {
-	const pendiente = Number(financeData.tInc || 0) - Number(financeData.tDep || 0);
 	const kpis = [
 		{label: 'Ingresos Totales', value: formatMoney(financeData.tInc), color: '#00b894'},
 		{label: 'Efectivo Recibido', value: formatMoney(financeData.tDep), color: '#0984e3'},
-		{label: 'Pendiente de Cobro', value: formatMoney(pendiente), color: '#e17055'},
+		{label: 'Pendiente de Cobro', value: formatMoney(financeData.pendienteCobro), color: '#e17055'},
 		{label: 'Gastos Operativos', value: formatMoney(financeData.tExp), color: '#ff7675'},
 		{label: 'Ganancia Neta', value: formatMoney(financeData.netProfit), color: '#6c5ce7'},
 	];
