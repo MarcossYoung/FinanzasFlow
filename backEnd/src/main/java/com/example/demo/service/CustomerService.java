@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class CustomerService {
@@ -49,6 +50,29 @@ public class CustomerService {
         Long actorId = actor != null ? actor.getId() : null;
         activityLogService.record(saved.getTenant().getId(), ActivityLogService.CUSTOMER_CREATED, actorId);
         return CustomerResponse.from(saved);
+    }
+
+    public CustomerResponse findOrCreate(CustomerCreateRequest req) {
+        Long tenantId = tenantId();
+        Optional<Customer> match = Optional.empty();
+        if (!isBlank(req.cuitDni())) {
+            match = customerRepo.findFirstByTenant_IdAndCuitDniIgnoreCase(tenantId, req.cuitDni().trim());
+        }
+        if (match.isEmpty() && !isBlank(req.name())) {
+            match = customerRepo.findFirstByTenant_IdAndNameIgnoreCase(tenantId, req.name().trim());
+        }
+        if (match.isEmpty() && !isBlank(req.email())) {
+            match = customerRepo.findFirstByTenant_IdAndEmailIgnoreCase(tenantId, req.email().trim());
+        }
+        if (match.isPresent()) return CustomerResponse.from(match.get());
+        if (isBlank(req.name())) {
+            throw new IllegalArgumentException("El nombre del cliente es obligatorio");
+        }
+        return create(req);
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     public CustomerResponse update(Long id, CustomerCreateRequest req) {

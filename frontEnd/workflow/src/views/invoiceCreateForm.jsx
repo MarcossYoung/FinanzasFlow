@@ -90,6 +90,28 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 		setDetectedCustomer(null);
 	};
 
+	const createDetectedCustomer = async () => {
+		if (!detectedCustomer) return;
+		const name = detectedCustomer.counterpartyName || detectedCustomer.originName;
+		if (!name?.trim()) return;
+		try {
+			const res = await axios.post(
+				`${BASE_URL}/api/customers/find-or-create`,
+				{
+					name: name.trim(),
+					cuitDni: detectedCustomer.cuitDni || detectedCustomer.originTaxId || null,
+					phone: detectedCustomer.phone || null,
+					email: null,
+				},
+				{headers: authHeaders()},
+			);
+			applyCustomerMatch(res.data, detectedCustomer);
+		} catch (err) {
+			console.error('Error creating detected customer', err);
+			setError('No se pudo crear el cliente detectado.');
+		}
+	};
+
 	const resolveExtractedCustomer = async (extraction) => {
 		// Transfer receipts don't have a single "counterparty" — the AI puts the
 		// sender's identity in originName/originTaxId instead. The origin account
@@ -231,22 +253,29 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 											.filter(Boolean)
 											.join(' - ')}
 									</span>
-									{detectedCustomer.candidates?.length > 0 && (
-										<div className='detected-customer-actions'>
-											{detectedCustomer.candidates.map((customer, index) => (
-												<button
-													key={customer.id || index}
-													type='button'
-													className='btn-pill'
-													onClick={() => applyCustomerMatch(customer)}
-												>
-													{[customer.name, customer.cuitDni]
-														.filter(Boolean)
-														.join(' - ')}
-												</button>
-											))}
-										</div>
-									)}
+									<div className='detected-customer-actions'>
+										{detectedCustomer.candidates?.map((customer, index) => (
+											<button
+												key={customer.id || index}
+												type='button'
+												className='btn-pill'
+												onClick={() => applyCustomerMatch(customer)}
+											>
+												{[customer.name, customer.cuitDni]
+													.filter(Boolean)
+													.join(' - ')}
+											</button>
+										))}
+										{(detectedCustomer.counterpartyName || detectedCustomer.originName) && (
+											<button
+												type='button'
+												className='btn-pill btn-pill-create'
+												onClick={createDetectedCustomer}
+											>
+												+ Crear cliente nuevo
+											</button>
+										)}
+									</div>
 								</div>
 							)}
 					</div>

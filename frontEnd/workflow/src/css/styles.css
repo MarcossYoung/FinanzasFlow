@@ -1083,6 +1083,12 @@ main,
 	font-size: 0.78rem;
 }
 
+.detected-customer-actions .btn-pill-create {
+	border-style: dashed;
+	color: #00875a;
+	border-color: #00875a;
+}
+
 /* Mensajes de Feedback */
 .error-text {
 	color: #d63031;
