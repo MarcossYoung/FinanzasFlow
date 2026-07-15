@@ -28,6 +28,7 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 	const [success, setSuccess] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 	const [detectedCustomer, setDetectedCustomer] = useState(null);
+	const [pendingCustomer, setPendingCustomer] = useState(null);
 	const [selectedCustomerLabel, setSelectedCustomerLabel] = useState('');
 	const [customerPickerKey, setCustomerPickerKey] = useState(0);
 
@@ -38,7 +39,15 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 
 	const handleCustomerChange = (customerId) => {
 		setInvoiceData((prev) => ({...prev, customerId: customerId || ''}));
-		if (customerId) setDetectedCustomer(null);
+		if (customerId) {
+			setDetectedCustomer(null);
+			setPendingCustomer(null);
+		}
+	};
+
+	const handleCustomerQueryChange = (text) => {
+		const name = text.trim();
+		setPendingCustomer(name ? {name, cuitDni: null, phone: null} : null);
 	};
 
 	const handleInputChange = (e) => {
@@ -113,10 +122,17 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 		);
 	};
 
+	const pendingFromExtraction = (extraction) => ({
+		name: extraction.counterpartyName?.trim() || '',
+		cuitDni: extraction.cuitDni?.trim() || null,
+		phone: extraction.phone?.trim() || null,
+	});
+
 	const resolveExtractedCustomer = async (extraction) => {
 		const query = extraction.counterpartyName?.trim();
 		if (!query) {
 			setInvoiceData((prev) => ({...prev, customerId: ''}));
+			setPendingCustomer(pendingFromExtraction(extraction));
 			setDetectedCustomer(extraction.counterpartyName || extraction.cuitDni ? extraction : null);
 			return;
 		}
@@ -131,13 +147,16 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 				setSelectedCustomerLabel(matches[0].name || query);
 				setCustomerPickerKey((key) => key + 1);
 				setDetectedCustomer(null);
+				setPendingCustomer(null);
 				return;
 			}
 			setInvoiceData((prev) => ({...prev, customerId: ''}));
+			setPendingCustomer(pendingFromExtraction(extraction));
 			setDetectedCustomer(extraction);
 		} catch (err) {
 			console.error('Error searching extracted customer', err);
 			setInvoiceData((prev) => ({...prev, customerId: ''}));
+			setPendingCustomer(pendingFromExtraction(extraction));
 			setDetectedCustomer(extraction);
 		}
 	};
@@ -169,28 +188,53 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 		setSuccess(false);
 
 		const token = user?.token || localStorage.getItem('token');
-		const payload = {
-			...invoiceData,
-			precio: lineItemsTotal,
-			lineItems: invoiceData.lineItems
-				.filter((item) => item.description?.trim())
-				.map((item) => ({
-					description: item.description.trim(),
-					quantity: Number(item.quantity || 0),
-					unitPrice: Number(item.unitPrice || 0),
-				})),
-			customerId: invoiceData.customerId || null,
-			amount: invoiceData.amount > 0 ? invoiceData.amount : null,
-			fechaEntrega: invoiceData.fechaEntrega || null,
-			fechaEstimada: invoiceData.fechaEstimada || invoiceData.fechaEntrega || null,
+		const headers = {
+			Authorization: `Bearer ${token}`,
+			'Content-Type': 'application/json',
 		};
 
 		try {
+			let customerId = invoiceData.customerId || null;
+			const pendingCustomerName = pendingCustomer?.name?.trim();
+			if (!customerId && pendingCustomerName) {
+				const customerRes = await axios.post(
+					`${BASE_URL}/api/customers`,
+					{
+						name: pendingCustomerName,
+						cuitDni: pendingCustomer.cuitDni || null,
+						email: null,
+						phone: pendingCustomer.phone || invoiceData.clientPhone || null,
+						notes: null,
+						paymentScore: null,
+					},
+					{headers},
+				);
+				customerId = customerRes.data?.id || null;
+				if (!customerId) {
+					throw new Error('Customer creation did not return an id');
+				}
+				setInvoiceData((prev) => ({...prev, customerId}));
+				setPendingCustomer(null);
+			}
+
+			const payload = {
+				...invoiceData,
+				precio: lineItemsTotal,
+				lineItems: invoiceData.lineItems
+					.filter((item) => item.description?.trim())
+					.map((item) => ({
+						description: item.description.trim(),
+						quantity: Number(item.quantity || 0),
+						unitPrice: Number(item.unitPrice || 0),
+					})),
+				customerId,
+				amount: invoiceData.amount > 0 ? invoiceData.amount : null,
+				fechaEntrega: invoiceData.fechaEntrega || null,
+				fechaEstimada: invoiceData.fechaEstimada || invoiceData.fechaEntrega || null,
+			};
+
 			await axios.post(`${BASE_URL}/api/invoices/create`, payload, {
-				headers: {
-					Authorization: `Bearer ${token}`,
-					'Content-Type': 'application/json',
-				},
+				headers,
 			});
 			setSuccess(true);
 			setTimeout(() => {
@@ -242,6 +286,7 @@ const InvoiceCreateForm = ({isModal = false, onClose}) => {
 							key={customerPickerKey}
 							value={invoiceData.customerId}
 							onChange={handleCustomerChange}
+							onQueryChange={handleCustomerQueryChange}
 							initialLabel={selectedCustomerLabel}
 							headers={authHeaders()}
 						/>

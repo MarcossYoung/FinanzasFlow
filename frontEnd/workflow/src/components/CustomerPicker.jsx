@@ -2,7 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import axios from 'axios';
 import {BASE_URL} from '../api/config';
 
-export default function CustomerPicker({value, onChange, initialLabel = '', headers}) {
+export default function CustomerPicker({value, onChange, initialLabel = '', headers, onQueryChange}) {
 	const [query, setQuery] = useState(initialLabel);
 	const [results, setResults] = useState([]);
 	const [open, setOpen] = useState(false);
@@ -10,7 +10,8 @@ export default function CustomerPicker({value, onChange, initialLabel = '', head
 	const debounceRef = useRef(null);
 
 	useEffect(() => {
-		if (!value) setQuery(initialLabel || '');
+		if (value && initialLabel) setQuery(initialLabel);
+		if (!value && !initialLabel) setQuery('');
 	}, [value, initialLabel]);
 
 	useEffect(() => {
@@ -32,6 +33,7 @@ export default function CustomerPicker({value, onChange, initialLabel = '', head
 		setQuery(q);
 		setOpen(true);
 		onChange('');
+		onQueryChange?.(q);
 
 		if (debounceRef.current) clearTimeout(debounceRef.current);
 		if (!q.trim()) {
@@ -54,6 +56,7 @@ export default function CustomerPicker({value, onChange, initialLabel = '', head
 	const selectCustomer = (customer) => {
 		setQuery(customer.name);
 		onChange(customer.id);
+		onQueryChange?.('');
 		setResults([]);
 		setOpen(false);
 	};

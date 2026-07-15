@@ -39,6 +39,18 @@ public class CustomerService {
     }
 
     public CustomerResponse create(CustomerCreateRequest req) {
+        Long tenantId = tenantId();
+        String cuitDni = trimToNull(req.cuitDni());
+        if (cuitDni != null) {
+            var existing = customerRepo.findFirstByTenant_IdAndCuitDniIgnoreCase(tenantId, cuitDni);
+            if (existing.isPresent()) return CustomerResponse.from(existing.get());
+        }
+        String name = trimToNull(req.name());
+        if (name != null) {
+            var existing = customerRepo.findFirstByTenant_IdAndNameIgnoreCase(tenantId, name);
+            if (existing.isPresent()) return CustomerResponse.from(existing.get());
+        }
+
         Customer customer = new Customer();
         apply(customer, req);
         customer.setTenant(tenant());
@@ -71,6 +83,12 @@ public class CustomerService {
         customer.setPhone(req.phone());
         customer.setNotes(req.notes());
         customer.setPaymentScore(req.paymentScore());
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private Long tenantId() {
