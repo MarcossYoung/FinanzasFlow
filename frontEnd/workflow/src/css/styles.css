@@ -1594,6 +1594,76 @@ main,
 	padding: 1rem;
 }
 
+/* Ledger attach input (AI extraction control - Costos / Facturas / cobro attach) */
+.ledger-attach-input {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	min-width: 0;
+}
+
+.ledger-attach-file-input {
+	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+	min-height: 44px;
+	padding: 0.55rem 0.75rem;
+	border: 1px dashed var(--color-border);
+	border-radius: var(--radius-sm);
+	background: var(--color-border-light);
+	color: var(--color-text-muted);
+	font-size: 0.85rem;
+}
+
+.ledger-attach-file-input::file-selector-button {
+	min-height: 32px;
+	margin-right: 0.75rem;
+	padding: 0.5rem 1rem;
+	border: none;
+	border-radius: var(--radius-sm);
+	background: var(--color-primary);
+	color: #fff;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.ledger-attach-file-input::-webkit-file-upload-button {
+	min-height: 32px;
+	margin-right: 0.75rem;
+	padding: 0.5rem 1rem;
+	border: none;
+	border-radius: var(--radius-sm);
+	background: var(--color-primary);
+	color: #fff;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.ledger-attach-actions {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	padding-top: 0.75rem;
+	border-top: 1px solid var(--color-border-light);
+}
+
+.ledger-attach-actions .btn-pill {
+	min-height: 44px;
+	flex-shrink: 0;
+}
+
+.ledger-attach-status {
+	color: var(--color-text-muted);
+	font-size: 0.85rem;
+	font-weight: 600;
+}
+
+.ledger-attach-actions .error-text {
+	margin: 0;
+	flex-basis: 100%;
+}
+
 /* Page-level heading shared by main views */
 .page-title {
 	font-size: 1.25rem;
@@ -2669,6 +2739,18 @@ main,
   color: var(--color-text-muted);
   font-size: 0.78rem;
   margin-top: 0.25rem;
+}
+
+/* Item 8: Ledger attach input - stack actions row on mobile */
+@media (max-width: 768px) {
+	.ledger-attach-actions {
+		flex-direction: column;
+		align-items: stretch;
+	}
+	.ledger-attach-actions .btn-pill {
+		width: 100%;
+		justify-content: center;
+	}
 }
 
 /* Customer picker (searchable combobox for invoice create/edit) */
