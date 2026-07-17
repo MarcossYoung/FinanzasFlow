@@ -40,6 +40,11 @@ public class CustomerController {
         return ResponseEntity.ok(customerService.create(req));
     }
 
+    @PostMapping("/find-or-create")
+    public ResponseEntity<CustomerResponse> findOrCreate(@RequestBody CustomerCreateRequest req) {
+        return ResponseEntity.ok(customerService.findOrCreate(req));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<CustomerResponse> update(@PathVariable Long id, @RequestBody CustomerCreateRequest req) {
         return ResponseEntity.ok(customerService.update(id, req));
