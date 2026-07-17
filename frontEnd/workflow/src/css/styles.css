@@ -1083,6 +1083,12 @@ main,
 	font-size: 0.78rem;
 }
 
+.detected-customer-actions .btn-pill-create {
+	border-style: dashed;
+	color: #00875a;
+	border-color: #00875a;
+}
+
 /* Mensajes de Feedback */
 .error-text {
 	color: #d63031;
@@ -2741,6 +2747,7 @@ main,
   margin-top: 0.25rem;
 }
 
+<<<<<<< HEAD
 /* Item 8: Ledger attach input - stack actions row on mobile */
 @media (max-width: 768px) {
 	.ledger-attach-actions {
@@ -2751,6 +2758,18 @@ main,
 		width: 100%;
 		justify-content: center;
 	}
+=======
+/* Item 8: Ledger attach input — stack actions row on mobile */
+@media (max-width: 768px) {
+  .ledger-attach-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ledger-attach-actions .btn-pill {
+    width: 100%;
+    justify-content: center;
+  }
+>>>>>>> e6802d0cb2eb8b88a2c9260c85091e5feae39f82
 }
 
 /* Customer picker (searchable combobox for invoice create/edit) */

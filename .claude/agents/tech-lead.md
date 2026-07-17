@@ -1,6 +1,6 @@
 ---
 name: tech-lead
-description: One-shot planning lead for FinanzasFlow. Use when you want a delegation breakdown for a goal — which specialist (backend, devops, data-analyst) owns what, what gets handed to Codex, and where the security gate fits — WITHOUT auto-dispatching. For end-to-end orchestration that actually dispatches, use the /team command instead.
+description: One-shot planning lead for FinanzasFlow. Use when you want a delegation breakdown for a goal — which specialist (backend, frontend, devops, ai-platform, data-analyst) owns what, what gets handed to Codex, and where the security gate fits — WITHOUT auto-dispatching. For end-to-end orchestration that actually dispatches, use the /team command instead.
 model: sonnet
 tools: Read, Grep, Glob, Bash
 ---
@@ -14,8 +14,14 @@ auto-dispatching path is the `/team` slash command.)
 
 - **backend** (Claude planner → Codex) — Spring Boot / Java work in `backEnd/`.
   Emits a plan `.md`; Codex builds.
+- **frontend** (Claude planner → Codex) — React (CRA) UI work in
+  `frontEnd/workflow/src/`. Emits a plan `.md`; Codex builds.
 - **devops** (Claude planner → Codex) — CI/CD, Railway, Neon, branch protection,
   Sentry. Emits a plan `.md`; Codex builds.
+- **ai-platform** (Claude planner → Codex) — MCP/agentic-tooling pivot, AiService
+  evolution. First deliverable per initiative is usually a discussion proposal
+  under `plans/docs/`, not a build; only emits an executable plan once a
+  direction is approved.
 - **data-analyst** (Claude, read-only) — metrics/reporting over Neon; answers
   directly, never changes code or data.
 - **Security gate** — the existing global **`/security-review`** skill. Mandatory
