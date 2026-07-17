@@ -1,5 +1,6 @@
 package com.example.demo.service;
 
+import com.example.demo.config.TenantContext;
 import com.example.demo.dto.FinanceDashboardResponse;
 import com.example.demo.dto.InvoiceResponse;
 import com.example.demo.dto.AiUsage;
@@ -25,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Base64;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class AiService {
@@ -38,8 +40,8 @@ public class AiService {
     @Value("${anthropic.api.key:}")
     private String apiKey;
 
-    private String cachedDigestText = null;
-    private String cachedDigestWeek = null;
+    private final Map<Long, CachedDigest> weeklyDigestCache = new ConcurrentHashMap<>();
+    private record CachedDigest(String week, String text) {}
 
     private static final String ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
     private static final String MODEL = "claude-haiku-4-5-20251001";
@@ -387,12 +389,14 @@ public class AiService {
     }
 
     public Map<String, Object> generateWeeklyDigest() {
+        Long tenantId = TenantContext.get();
         LocalDate today = LocalDate.now();
         WeekFields wf = WeekFields.ISO;
         String currentWeek = today.getYear() + "-W" + String.format("%02d", today.get(wf.weekOfWeekBasedYear()));
 
-        if (currentWeek.equals(cachedDigestWeek) && cachedDigestText != null) {
-            return Map.of("digest", cachedDigestText, "generatedAt", today.toString(), "week", currentWeek);
+        CachedDigest cached = tenantId != null ? weeklyDigestCache.get(tenantId) : null;
+        if (cached != null && currentWeek.equals(cached.week())) {
+            return Map.of("digest", cached.text(), "generatedAt", today.toString(), "week", currentWeek);
         }
 
         List<InvoiceResponse> disputed = invoiceService.getProductsPastDue();
@@ -417,8 +421,9 @@ public class AiService {
                 "Prioriza riesgo de cobranza, efectivo esperado, facturas por vencer y acciones de seguimiento.";
 
         String digest = callClaude(system, "Resumen semanal del negocio:\n" + context, 150);
-        cachedDigestText = digest;
-        cachedDigestWeek = currentWeek;
+        if (tenantId != null) {
+            weeklyDigestCache.put(tenantId, new CachedDigest(currentWeek, digest));
+        }
 
         return Map.of("digest", digest, "generatedAt", today.toString(), "week", currentWeek);
     }

@@ -137,6 +137,14 @@ export default function CostsManager() {
 			amount: extraction.amount ?? prev.amount,
 			reason: extraction.titulo || extraction.description || prev.reason,
 		}));
+		if (extraction.issueDate) {
+			const extractedMonth = extraction.issueDate.slice(0, 7);
+			setSelectedMonth((prev) => {
+				if (prev === extractedMonth) return prev;
+				setCurrentPage(0);
+				return extractedMonth;
+			});
+		}
 	};
 
 	const handleDelete = async (id) => {

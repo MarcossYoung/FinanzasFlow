@@ -1,5 +1,6 @@
 package com.example.demo.service;
 
+import com.example.demo.config.TenantContext;
 import com.example.demo.model.Invoice;
 import com.example.demo.model.Status;
 import com.example.demo.model.WorkOrder;
@@ -29,7 +30,8 @@ public class WorkOrderService {
     }
 
     public WorkOrder updateStatus(Long id, Status status) {
-        WorkOrder workOrder = workOrderRepository.findById(id)
+        Long tenantId = TenantContext.get();
+        WorkOrder workOrder = workOrderRepository.findByIdAndInvoice_Tenant_Id(id, tenantId)
                 .orElseThrow(() -> new RuntimeException("WorkOrder not found"));
         workOrder.setStatus(status);
         workOrder.setUpdateAt(LocalDateTime.now());

@@ -17,5 +17,6 @@ public record FinanceDashboardResponse(
         BigDecimal tCogs,
         BigDecimal grossProfit,
         BigDecimal netProfit,
-        List<Map<String,Object>> customerStats
+        List<Map<String,Object>> customerStats,
+        BigDecimal pendienteCobro
 ) {}

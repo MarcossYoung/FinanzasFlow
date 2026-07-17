@@ -21,6 +21,8 @@ public interface PaymentRepo extends JpaRepository<OrderPayments, Long> {
 
     List<OrderPayments> findByPaymentDateBetweenAndTenant_Id(LocalDate from, LocalDate to, Long tenantId);
 
+    List<OrderPayments> findByPaymentDateLessThanEqualAndTenant_Id(LocalDate to, Long tenantId);
+
     Optional<OrderPayments> findByIdAndTenant_Id(Long id, Long tenantId);
 
     // FIX: Standardized to use 'fecha' and 'valor'
